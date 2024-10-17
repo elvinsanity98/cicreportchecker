@@ -83,7 +83,8 @@
                     const worksheet = workbook.Sheets[sheetName];
                     const range = XLSX.utils.decode_range(worksheet['!ref']); // Get range of the sheet
 
-                    for (let row = range.s.r; row <= range.e.r; row++) {
+                    // Start checking from row 4 (index 3) onward
+                    for (let row = 3; row <= range.e.r; row++) {
                         for (let col = range.s.c; col <= range.e.c; col++) {
                             const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: col })];
                             const cellValue = cell ? cell.v : "";

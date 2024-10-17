@@ -104,7 +104,8 @@
                 // Check each line for symbols (excluding |)
                 lines.forEach((line, index) => {
                     if (/[^a-zA-Z0-9\s|]/.test(line)) {
-                        errorLines.push(`Line ${index + 1}: ${line}`);
+                        const errors = line.match(/[^a-zA-Z0-9\s|]+/g); // Get the symbols
+                        errorLines.push(`Line ${index + 1}: ${errors.join(", ")}`); // Show line number and errors
                     }
                 });
 

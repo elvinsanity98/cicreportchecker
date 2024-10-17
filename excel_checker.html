@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIC Report (Excel Checker)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f8ff; /* Light blue background */
+            color: #333;
+        }
+        h1 {
+            color: #007bff; /* Blue title */
+            text-align: center;
+        }
+        input[type="file"] {
+            display: block;
+            margin: 20px auto;
+        }
+        button {
+            background-color: #007bff; /* Blue button */
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 10px auto;
+            width: 200px;
+        }
+        button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+        .results {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .credits {
+            margin-top: 30px;
+            text-align: center;
+            font-style: italic;
+            color: #007bff; /* Blue credits */
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>CIC Report (Excel Checker)</h1>
+    
+    <input type="file" id="fileInput" accept=".xlsx, .xls" />
+    <button id="checkButton">Check for Symbols</button>
+    
+    <div class="results" id="results"></div>
+
+    <div class="credits">
+        Design by: ELVIN JHON GIMENA - RBLI IT HEAD
+    </div>
+
+    <script>
+        document.getElementById('checkButton').onclick = function() {
+            const fileInput = document.getElementById('fileInput');
+            const resultsDiv = document.getElementById('results');
+
+            if (fileInput.files.length === 0) {
+                alert("Please select an Excel file.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                let errorLines = [];
+
+                // Iterate through each sheet in the workbook
+                workbook.SheetNames.forEach(sheetName => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    const range = XLSX.utils.decode_range(worksheet['!ref']); // Get range of the sheet
+
+                    for (let row = range.s.r; row <= range.e.r; row++) {
+                        for (let col = range.s.c; col <= range.e.c; col++) {
+                            const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: col })];
+                            const cellValue = cell ? cell.v : "";
+
+                            // Check for symbols
+                            if (/[^a-zA-Z0-9\s]/.test(cellValue)) {
+                                errorLines.push(`Row ${row + 1}, Column ${col + 1}: ${cellValue}`);
+                            }
+                        }
+                    }
+                });
+
+                // Display results
+                if (errorLines.length > 0) {
+                    resultsDiv.innerHTML = "<h2>Found Symbols in the Following Cells:</h2><pre>" + errorLines.join("\n") + "</pre>";
+                } else {
+                    resultsDiv.innerHTML = "<h2>No Symbols Found!</h2>";
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        };
+    </script>
+</body>
+</html>

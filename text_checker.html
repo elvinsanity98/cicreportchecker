@@ -15,6 +15,10 @@
             color: #007bff; /* Blue title */
             text-align: center;
         }
+        input[type="file"] {
+            display: block;
+            margin: 20px auto;
+        }
         button {
             background-color: #007bff; /* Blue button */
             color: white;
@@ -30,23 +34,89 @@
         button:hover {
             background-color: #0056b3; /* Darker blue on hover */
         }
+        .results {
+            margin-top: 20px;
+            text-align: center;
+        }
         .credits {
             margin-top: 30px;
             text-align: center;
             font-style: italic;
             color: #007bff; /* Blue credits */
         }
+        /* Loading spinner styles */
+        .loader {
+            border: 8px solid #f3f3f3; /* Light grey */
+            border-top: 8px solid #007bff; /* Blue */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+            margin: 20px auto; /* Center it */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <h1>CIC Report (Text Checker)</h1>
     
-    <!-- Your text checker implementation goes here -->
-    
+    <input type="file" id="fileInput" accept=".txt" />
+    <button id="checkButton">Check File</button> <!-- Button to check file -->
     <button onclick="location.href='index.html'">Back to Menu</button> <!-- Back to Menu button -->
     
+    <div class="loader" id="loader"></div> <!-- Loading spinner -->
+    <div class="results" id="results"></div>
+
     <div class="credits">
         Design by: ELVIN JHON GIMENA - RBLI IT HEAD
     </div>
+
+    <script>
+        document.getElementById('checkButton').onclick = function() {
+            const fileInput = document.getElementById('fileInput');
+            const resultsDiv = document.getElementById('results');
+            const loader = document.getElementById('loader');
+
+            if (fileInput.files.length === 0) {
+                alert("Please select a text file.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            // Show the loader
+            loader.style.display = 'block';
+
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n'); // Split text into lines
+                let errorLines = [];
+
+                // Check each line for symbols (excluding |)
+                lines.forEach((line, index) => {
+                    if (/[^a-zA-Z0-9\s|]/.test(line)) {
+                        errorLines.push(`Line ${index + 1}: ${line}`);
+                    }
+                });
+
+                // Hide the loader
+                loader.style.display = 'none';
+
+                // Display results
+                if (errorLines.length > 0) {
+                    resultsDiv.innerHTML = "<h2>Found Symbols in the Following Lines:</h2><pre>" + errorLines.join("\n") + "</pre>";
+                } else {
+                    resultsDiv.innerHTML = "<h2>No Symbols Found!</h2>";
+                }
+            };
+
+            reader.readAsText(file);
+        };
+    </script>
 </body>
 </html>

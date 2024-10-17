@@ -44,6 +44,21 @@
             font-style: italic;
             color: #007bff; /* Blue credits */
         }
+        /* Loading spinner styles */
+        .loader {
+            border: 8px solid #f3f3f3; /* Light grey */
+            border-top: 8px solid #007bff; /* Blue */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+            margin: 20px auto; /* Center it */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
 </head>
@@ -51,8 +66,9 @@
     <h1>CIC Report (Excel Checker)</h1>
     
     <input type="file" id="fileInput" accept=".xlsx, .xls" />
-    <button id="checkButton">Check File</button> <!-- Changed button text to "Check File" -->
+    <button id="checkButton">Check File</button> <!-- Button text changed to "Check File" -->
     
+    <div class="loader" id="loader"></div> <!-- Loading spinner -->
     <div class="results" id="results"></div>
 
     <div class="credits">
@@ -63,6 +79,7 @@
         document.getElementById('checkButton').onclick = function() {
             const fileInput = document.getElementById('fileInput');
             const resultsDiv = document.getElementById('results');
+            const loader = document.getElementById('loader');
 
             if (fileInput.files.length === 0) {
                 alert("Please select an Excel file.");
@@ -71,6 +88,9 @@
 
             const file = fileInput.files[0];
             const reader = new FileReader();
+
+            // Show the loader
+            loader.style.display = 'block';
 
             reader.onload = function(e) {
                 const data = new Uint8Array(e.target.result);
@@ -96,6 +116,9 @@
                         }
                     }
                 });
+
+                // Hide the loader
+                loader.style.display = 'none';
 
                 // Display results
                 if (errorLines.length > 0) {

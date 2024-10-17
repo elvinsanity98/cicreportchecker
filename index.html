@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIC Report Submission Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f8ff; /* Light blue background */
+            color: #333;
+        }
+        .logo {
+            display: block;
+            margin: 0 auto;
+            width: 400px; /* Increased width for a bigger logo */
+            height: auto; /* Maintain aspect ratio */
+        }
+        button {
+            background-color: #007bff; /* Blue button */
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 10px auto;
+            width: 200px;
+        }
+        button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+        button:disabled {
+            background-color: #ccc; /* Grey button for disabled state */
+            cursor: not-allowed; /* Change cursor to indicate disabled */
+        }
+        .credits {
+            margin-top: 30px;
+            text-align: center;
+            font-style: italic;
+            color: #007bff; /* Blue credits */
+        }
+    </style>
+</head>
+<body>
+    <img src="LOGO.png" alt="CIC Report Logo" class="logo">
+    
+    <h1 style="display: none;">CIC Report Submission Checker</h1> <!-- Hidden for accessibility -->
+    
+    <button onclick="window.location.href='text_checker.html'">CIC Report (Text Checker)</button>
+    <button disabled title="Under Development">CIC Report (Excel Checker) - Under Development</button>
+
+    <div class="credits">
+        Design by: ELVIN JHON GIMENA - RBLI IT HEAD
+    </div>
+</body>
+</html>

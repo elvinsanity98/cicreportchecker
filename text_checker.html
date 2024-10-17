@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CIC Report Submission Checker - Text Checker</title>
+    <title>CIC Report (Text Checker)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,10 +14,6 @@
         h1 {
             color: #007bff; /* Blue title */
             text-align: center;
-        }
-        input[type="file"] {
-            margin: 10px auto;
-            display: block;
         }
         button {
             background-color: #007bff; /* Blue button */
@@ -34,13 +30,6 @@
         button:hover {
             background-color: #0056b3; /* Darker blue on hover */
         }
-        #result {
-            margin-top: 20px;
-            border: 1px solid #ccc;
-            padding: 10px;
-            white-space: pre-wrap; /* Preserve whitespace for better formatting */
-            background-color: #e7f1ff; /* Light blue for results area */
-        }
         .credits {
             margin-top: 30px;
             text-align: center;
@@ -50,55 +39,14 @@
     </style>
 </head>
 <body>
-    <h1>CIC Report Submission Checker - Text Checker</h1>
-    <input type="file" id="fileInput" accept=".txt" />
-    <button id="checkButton">Check File</button>
+    <h1>CIC Report (Text Checker)</h1>
     
-    <div id="result"></div>
-
+    <!-- Your text checker implementation goes here -->
+    
+    <button onclick="location.href='index.html'">Back to Menu</button> <!-- Back to Menu button -->
+    
     <div class="credits">
         Design by: ELVIN JHON GIMENA - RBLI IT HEAD
     </div>
-
-    <script>
-        document.getElementById('checkButton').addEventListener('click', function () {
-            const fileInput = document.getElementById('fileInput');
-            const resultDiv = document.getElementById('result');
-
-            if (fileInput.files.length === 0) {
-                resultDiv.innerText = 'Please select a .txt file to check.';
-                return;
-            }
-
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-
-            reader.onload = function (e) {
-                const text = e.target.result;
-                const lines = text.split('\n');
-                // Updated pattern: allow pipe | character as an exception
-                const specialCharPattern = /[^\w\sñ|]/;
-                let errorLines = [];
-
-                for (let i = 0; i < lines.length; i++) {
-                    if (specialCharPattern.test(lines[i]) || lines[i].includes('ñ')) {
-                        errorLines.push(`Line ${i + 1}: ${lines[i].trim()}`);
-                    }
-                }
-
-                if (errorLines.length > 0) {
-                    resultDiv.innerHTML = `Errors found:\n${errorLines.join('<br/>')}`;
-                } else {
-                    resultDiv.innerText = "No special characters or 'ñ' found in the text file.";
-                }
-            };
-
-            reader.onerror = function () {
-                resultDiv.innerText = 'Error reading file.';
-            };
-
-            reader.readAsText(file);
-        });
-    </script>
 </body>
 </html>

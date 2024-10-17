@@ -113,8 +113,8 @@
                             const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
                             const cell = worksheet[cellAddress];
 
-                            if (cell && /[^a-zA-Z0-9\s|]/.test(cell.v)) {
-                                errorCells.push(`Sheet: ${sheetName}, Cell ${cellAddress}: ${cell.v}`);
+                            if (cell && typeof cell.v === 'string' && /[^a-zA-Z0-9\s|]/.test(cell.v)) {
+                                errorCells.push(`Line ${row + 1}: ${cell.v}`); // Show line number and error
                             }
                         }
                     }

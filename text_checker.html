@@ -15,9 +15,10 @@
             color: #007bff; /* Blue title */
             text-align: center;
         }
-        input[type="file"] {
-            display: block;
-            margin: 20px auto;
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin: 20px 0;
         }
         button {
             background-color: #007bff; /* Blue button */
@@ -61,66 +62,64 @@
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+             100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <h1>CIC Report (Text Checker)</h1>
-    
-    <input type="file" id="fileInput" accept=".txt" />
-    <button id="checkButton">Check File</button> <!-- Button to check file -->
+
+    <textarea id="textInput" placeholder="Paste your text here..."></textarea>
+    <button id="checkButtonText">Check Text</button> <!-- Button to check text -->
     <button onclick="location.href='index.html'">Back to Menu</button> <!-- Back to Menu button -->
-    
-    <div class="loader" id="loader"></div> <!-- Loading spinner -->
-    <div class="results" id="results"></div>
+
+    <div class="loader" id="loaderText"></div> <!-- Loading spinner -->
+    <div class="results" id="resultsText"></div>
 
     <div class="credits">
         Design by: ELVIN JHON GIMENA - RBLI IT HEAD
     </div>
 
     <script>
-        document.getElementById('checkButton').onclick = function() {
-            const fileInput = document.getElementById('fileInput');
-            const resultsDiv = document.getElementById('results');
-            const loader = document.getElementById('loader');
-
-            if (fileInput.files.length === 0) {
-                alert("Please select a text file.");
-                return;
+        // Function to sanitize cell values by removing special characters except '|'
+        function sanitizeValue(value) {
+            if (typeof value === 'string') {
+                return value.replace(/[^a-zA-Z0-9\s|]/g, ''); // Keep alphanumeric and spaces, allow '|'
             }
+            return value;
+        }
 
-            const file = fileInput.files[0];
-            const reader = new FileReader();
+        document.getElementById('checkButtonText').onclick = function() {
+            const inputText = document.getElementById('textInput').value;
+            const resultsDiv = document.getElementById('resultsText');
+            const loader = document.getElementById('loaderText');
 
             // Show the loader
             loader.style.display = 'block';
 
-            reader.onload = function(e) {
-                const text = e.target.result;
-                const lines = text.split('\n'); // Split text into lines
-                let errorLines = [];
+            // Sanitize the input text
+            const sanitizedText = sanitizeValue(inputText);
 
-                // Check each line for symbols (excluding |)
-                lines.forEach((line, index) => {
-                    if (/[^a-zA-Z0-9\s|]/.test(line)) {
-                        const errors = line.match(/[^a-zA-Z0-9\s|]+/g); // Get the symbols
-                        errorLines.push(`Line ${index + 1}: ${errors.join(", ")}`); // Show line number and errors
-                    }
-                });
+            // Check for special characters
+            const specialCharsRegex = /[^\w\s|]/g;
+            const errors = [];
+            const lines = sanitizedText.split('\n');
 
-                // Hide the loader
-                loader.style.display = 'none';
-
-                // Display results
-                if (errorLines.length > 0) {
-                    resultsDiv.innerHTML = "<h2>Found Symbols in the Following Lines:</h2><pre>" + errorLines.join("\n") + "</pre>";
-                } else {
-                    resultsDiv.innerHTML = "<h2>No Symbols Found!</h2>";
+            lines.forEach((line, index) => {
+                if (specialCharsRegex.test(line)) {
+                    errors.push(`Line ${index + 1}: Found special characters in "${line}"`);
                 }
-            };
+            });
 
-            reader.readAsText(file);
+            // Hide the loader
+            loader.style.display = 'none';
+
+            // Display results
+            if (errors.length > 0) {
+                resultsDiv.innerHTML = "<h2>Errors Found:</h2><pre>" + errors.join("\n") + "</pre>";
+            } else {
+                resultsDiv.innerHTML = "<h2>No Errors Found!</h2>";
+            }
         };
     </script>
 </body>

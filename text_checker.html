@@ -16,12 +16,8 @@
             text-align: center;
         }
         input[type="file"] {
-            margin: 20px auto;
             display: block;
-            padding: 10px;
-            border: 1px solid #007bff; /* Blue border */
-            border-radius: 5px;
-            cursor: pointer;
+            margin: 20px auto;
         }
         button {
             background-color: #007bff; /* Blue button */
@@ -71,31 +67,26 @@
 </head>
 <body>
     <h1>CIC Report (Text Checker)</h1>
-
-    <input type="file" id="fileInput" accept=".txt" /> <!-- File input for uploading .txt files -->
-    <button id="checkButtonText">Check File</button> <!-- Button to check text -->
+    
+    <input type="file" id="fileInput" accept=".txt" />
+    <button id="checkButton">Check File</button> <!-- Button to check file -->
     <button onclick="location.href='index.html'">Back to Menu</button> <!-- Back to Menu button -->
-
-    <div class="loader" id="loaderText"></div> <!-- Loading spinner -->
-    <div class="results" id="resultsText"></div>
+    
+    <div class="loader" id="loader"></div> <!-- Loading spinner -->
+    <div class="results" id="results"></div>
 
     <div class="credits">
         Design by: ELVIN JHON GIMENA - RBLI IT HEAD
     </div>
 
     <script>
-        // Function to sanitize input text by removing special characters except '|'
-        function sanitizeValue(value) {
-            return value.replace(/[^a-zA-Z0-9\s|]/g, ''); // Keep alphanumeric and spaces, allow '|'
-        }
-
-        document.getElementById('checkButtonText').onclick = function() {
+        document.getElementById('checkButton').onclick = function() {
             const fileInput = document.getElementById('fileInput');
-            const resultsDiv = document.getElementById('resultsText');
-            const loader = document.getElementById('loaderText');
+            const resultsDiv = document.getElementById('results');
+            const loader = document.getElementById('loader');
 
             if (fileInput.files.length === 0) {
-                alert("Please upload a .txt file to check.");
+                alert("Please select a text file.");
                 return;
             }
 
@@ -105,15 +96,16 @@
             // Show the loader
             loader.style.display = 'block';
 
-            reader.onload = function(event) {
-                const fileContent = event.target.result;
-                const sanitizedText = sanitizeValue(fileContent);
-                const errors = [];
-                const lines = sanitizedText.split('\n');
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n'); // Split text into lines
+                let errorLines = [];
 
+                // Check each line for symbols (excluding |)
                 lines.forEach((line, index) => {
-                    if (/[^\w\s|]/.test(line)) {
-                        errors.push(`Line ${index + 1}: Found special characters in "${line}"`);
+                    if (/[^a-zA-Z0-9\s|]/.test(line)) {
+                        const errors = line.match(/[^a-zA-Z0-9\s|]+/g); // Get the symbols
+                        errorLines.push(`Line ${index + 1}: ${errors.join(", ")}`); // Show line number and errors
                     }
                 });
 
@@ -121,14 +113,14 @@
                 loader.style.display = 'none';
 
                 // Display results
-                if (errors.length > 0) {
-                    resultsDiv.innerHTML = "<h2>Errors Found:</h2><pre>" + errors.join("\n") + "</pre>";
+                if (errorLines.length > 0) {
+                    resultsDiv.innerHTML = "<h2>Found Symbols in the Following Lines:</h2><pre>" + errorLines.join("\n") + "</pre>";
                 } else {
-                    resultsDiv.innerHTML = "<h2>No Errors Found!</h2>";
+                    resultsDiv.innerHTML = "<h2>No Symbols Found!</h2>";
                 }
             };
 
-            reader.readAsText(file); // Read the uploaded file as text
+            reader.readAsText(file);
         };
     </script>
 </body>

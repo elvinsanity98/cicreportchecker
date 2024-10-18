@@ -62,7 +62,7 @@
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
-             100% { transform: rotate(360deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -81,6 +81,11 @@
     </div>
 
     <script>
+        // Function to sanitize input text by removing special characters except '|'
+        function sanitizeValue(value) {
+            return value.replace(/[^a-zA-Z0-9\s|]/g, ''); // Keep alphanumeric and spaces, allow '|'
+        }
+
         document.getElementById('checkButtonText').onclick = function() {
             const inputText = document.getElementById('textInput').value;
             const resultsDiv = document.getElementById('resultsText');
@@ -89,13 +94,13 @@
             // Show the loader
             loader.style.display = 'block';
 
-            // Check for special characters
-            const specialCharsRegex = /[^\w\s]/g; // Check for special characters excluding spaces
+            // Sanitize the input text
+            const sanitizedText = sanitizeValue(inputText);
             const errors = [];
-            const lines = inputText.split('\n');
+            const lines = sanitizedText.split('\n');
 
             lines.forEach((line, index) => {
-                if (specialCharsRegex.test(line)) {
+                if (/[^\w\s|]/.test(line)) {
                     errors.push(`Line ${index + 1}: Found special characters in "${line}"`);
                 }
             });

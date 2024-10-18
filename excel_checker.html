@@ -109,12 +109,27 @@
                     
                     // Start checking from row 4 (index 3)
                     for (let row = 3; row <= range.e.r; row++) {
+                        const cellBBAddress = XLSX.utils.encode_cell({ r: row, c: 54 }); // Column BB (index 54)
+                        const cellBCAddress = XLSX.utils.encode_cell({ r: row, c: 55 }); // Column BC (index 55)
+
+                        const cellBB = worksheet[cellBBAddress];
+                        const cellBC = worksheet[cellBCAddress];
+
+                        // Check for TIN number in column BB
+                        if (cellBB && cellBB.v === 10) {
+                            // Check if column BC is a number and within 9 to 12 digits
+                            if (!cellBC || !/^\d{9,12}$/.test(cellBC.v)) {
+                                errorCells.push(`Line ${row + 1}: Column BC must be a number with 9 to 12 digits when Column BB is 10.`);
+                            }
+                        }
+                        
+                        // Check for symbols in other cells
                         for (let col = range.s.c; col <= range.e.c; col++) {
                             const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
                             const cell = worksheet[cellAddress];
 
                             if (cell && typeof cell.v === 'string' && /[^a-zA-Z0-9\s|]/.test(cell.v)) {
-                                errorCells.push(`Line ${row + 1}: ${cell.v}`); // Show line number and error
+                                errorCells.push(`Line ${row + 1}: Found symbol in ${cellAddress} - ${cell.v}`); // Show line number and error
                             }
                         }
                     }
@@ -125,9 +140,9 @@
 
                 // Display results
                 if (errorCells.length > 0) {
-                    resultsDiv.innerHTML = "<h2>Found Symbols in the Following Cells:</h2><pre>" + errorCells.join("\n") + "</pre>";
+                    resultsDiv.innerHTML = "<h2>Errors Found:</h2><pre>" + errorCells.join("\n") + "</pre>";
                 } else {
-                    resultsDiv.innerHTML = "<h2>No Symbols Found!</h2>";
+                    resultsDiv.innerHTML = "<h2>No Errors Found!</h2>";
                 }
             };
 

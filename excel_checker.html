@@ -106,6 +106,9 @@
                 workbook.SheetNames.forEach(sheetName => {
                     const worksheet = workbook.Sheets[sheetName];
                     const range = XLSX.utils.decode_range(worksheet['!ref']);
+                    
+                    console.log(`Processing Sheet: ${sheetName}`);
+                    console.log(`Range: ${JSON.stringify(range)}`); // Log the range for debugging
 
                     // Start checking from row 4 (index 3)
                     for (let row = 3; row <= range.e.r; row++) {
@@ -114,6 +117,9 @@
 
                         const cellBB = worksheet[cellBBAddress];
                         const cellBC = worksheet[cellBCAddress];
+
+                        // Log the values for debugging
+                        console.log(`Row ${row + 1}: BB = ${cellBB ? cellBB.v : 'undefined'}, BC = ${cellBC ? cellBC.v : 'undefined'}`);
 
                         // Check for TIN number in column BB
                         if (cellBB && cellBB.v === 10) {

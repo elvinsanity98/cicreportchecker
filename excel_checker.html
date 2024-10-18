@@ -106,7 +106,7 @@
                 workbook.SheetNames.forEach(sheetName => {
                     const worksheet = workbook.Sheets[sheetName];
                     const range = XLSX.utils.decode_range(worksheet['!ref']);
-                    
+
                     // Start checking from row 4 (index 3)
                     for (let row = 3; row <= range.e.r; row++) {
                         const cellBBAddress = XLSX.utils.encode_cell({ r: row, c: 54 }); // Column BB (index 54)
@@ -122,7 +122,7 @@
                                 errorCells.push(`Line ${row + 1}: Column BC must be a number with 9 to 12 digits when Column BB is 10. Found: ${cellBC ? cellBC.v : 'undefined'}`);
                             }
                         }
-                        
+
                         // Check for symbols in other cells
                         for (let col = range.s.c; col <= range.e.c; col++) {
                             const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });

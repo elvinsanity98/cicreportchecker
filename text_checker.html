@@ -15,10 +15,13 @@
             color: #007bff; /* Blue title */
             text-align: center;
         }
-        textarea {
-            width: 100%;
-            height: 200px;
-            margin: 20px 0;
+        input[type="file"] {
+            margin: 20px auto;
+            display: block;
+            padding: 10px;
+            border: 1px solid #007bff; /* Blue border */
+            border-radius: 5px;
+            cursor: pointer;
         }
         button {
             background-color: #007bff; /* Blue button */
@@ -69,8 +72,8 @@
 <body>
     <h1>CIC Report (Text Checker)</h1>
 
-    <textarea id="textInput" placeholder="Paste your text here..."></textarea>
-    <button id="checkButtonText">Check Text</button> <!-- Button to check text -->
+    <input type="file" id="fileInput" accept=".txt" /> <!-- File input for uploading .txt files -->
+    <button id="checkButtonText">Check File</button> <!-- Button to check text -->
     <button onclick="location.href='index.html'">Back to Menu</button> <!-- Back to Menu button -->
 
     <div class="loader" id="loaderText"></div> <!-- Loading spinner -->
@@ -87,33 +90,45 @@
         }
 
         document.getElementById('checkButtonText').onclick = function() {
-            const inputText = document.getElementById('textInput').value;
+            const fileInput = document.getElementById('fileInput');
             const resultsDiv = document.getElementById('resultsText');
             const loader = document.getElementById('loaderText');
+
+            if (fileInput.files.length === 0) {
+                alert("Please upload a .txt file to check.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
 
             // Show the loader
             loader.style.display = 'block';
 
-            // Sanitize the input text
-            const sanitizedText = sanitizeValue(inputText);
-            const errors = [];
-            const lines = sanitizedText.split('\n');
+            reader.onload = function(event) {
+                const fileContent = event.target.result;
+                const sanitizedText = sanitizeValue(fileContent);
+                const errors = [];
+                const lines = sanitizedText.split('\n');
 
-            lines.forEach((line, index) => {
-                if (/[^\w\s|]/.test(line)) {
-                    errors.push(`Line ${index + 1}: Found special characters in "${line}"`);
+                lines.forEach((line, index) => {
+                    if (/[^\w\s|]/.test(line)) {
+                        errors.push(`Line ${index + 1}: Found special characters in "${line}"`);
+                    }
+                });
+
+                // Hide the loader
+                loader.style.display = 'none';
+
+                // Display results
+                if (errors.length > 0) {
+                    resultsDiv.innerHTML = "<h2>Errors Found:</h2><pre>" + errors.join("\n") + "</pre>";
+                } else {
+                    resultsDiv.innerHTML = "<h2>No Errors Found!</h2>";
                 }
-            });
+            };
 
-            // Hide the loader
-            loader.style.display = 'none';
-
-            // Display results
-            if (errors.length > 0) {
-                resultsDiv.innerHTML = "<h2>Errors Found:</h2><pre>" + errors.join("\n") + "</pre>";
-            } else {
-                resultsDiv.innerHTML = "<h2>No Errors Found!</h2>";
-            }
+            reader.readAsText(file); // Read the uploaded file as text
         };
     </script>
 </body>

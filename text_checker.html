@@ -81,14 +81,6 @@
     </div>
 
     <script>
-        // Function to sanitize cell values by removing special characters except '|'
-        function sanitizeValue(value) {
-            if (typeof value === 'string') {
-                return value.replace(/[^a-zA-Z0-9\s|]/g, ''); // Keep alphanumeric and spaces, allow '|'
-            }
-            return value;
-        }
-
         document.getElementById('checkButtonText').onclick = function() {
             const inputText = document.getElementById('textInput').value;
             const resultsDiv = document.getElementById('resultsText');
@@ -97,13 +89,10 @@
             // Show the loader
             loader.style.display = 'block';
 
-            // Sanitize the input text
-            const sanitizedText = sanitizeValue(inputText);
-
             // Check for special characters
-            const specialCharsRegex = /[^\w\s|]/g;
+            const specialCharsRegex = /[^\w\s]/g; // Check for special characters excluding spaces
             const errors = [];
-            const lines = sanitizedText.split('\n');
+            const lines = inputText.split('\n');
 
             lines.forEach((line, index) => {
                 if (specialCharsRegex.test(line)) {

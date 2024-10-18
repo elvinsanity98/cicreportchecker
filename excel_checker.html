@@ -118,8 +118,8 @@
                         // Check for TIN number in column BB
                         if (cellBB && cellBB.v === 10) {
                             // Check if column BC is a number and within 9 to 12 digits
-                            if (!cellBC || !/^\d{9,12}$/.test(cellBC.v)) {
-                                errorCells.push(`Line ${row + 1}: Column BC must be a number with 9 to 12 digits when Column BB is 10.`);
+                            if (!cellBC || !/^\d{9,12}$/.test(cellBC.v.toString())) {
+                                errorCells.push(`Line ${row + 1}: Column BC must be a number with 9 to 12 digits when Column BB is 10. Found: ${cellBC ? cellBC.v : 'undefined'}`);
                             }
                         }
                         

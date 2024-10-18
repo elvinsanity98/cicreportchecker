@@ -81,14 +81,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
     <script>
-        // Function to sanitize cell values by removing special characters except '|'
-        function sanitizeValue(value) {
-            if (typeof value === 'string') {
-                return value.replace(/[^a-zA-Z0-9\s|]/g, ''); // Keep alphanumeric and spaces, allow '|'
-            }
-            return value;
-        }
-
         document.getElementById('checkButtonExcel').onclick = function() {
             const fileInput = document.getElementById('fileInputExcel');
             const resultsDiv = document.getElementById('resultsExcel');
@@ -115,10 +107,7 @@
                     const worksheet = workbook.Sheets[sheetName];
                     const range = XLSX.utils.decode_range(worksheet['!ref']);
                     
-                    console.log(`Processing Sheet: ${sheetName}`);
-                    console.log(`Range: ${JSON.stringify(range)}`); // Log the range for debugging
-
-                    // Start checking from row 4 (index 3)
+                    // Check the rows starting from row 4 (index 3)
                     for (let row = 3; row <= range.e.r; row++) {
                         const cellBBAddress = XLSX.utils.encode_cell({ r: row, c: 54 }); // Column BB (index 54)
                         const cellBCAddress = XLSX.utils.encode_cell({ r: row, c: 55 }); // Column BC (index 55)
@@ -126,16 +115,11 @@
                         const cellBB = worksheet[cellBBAddress];
                         const cellBC = worksheet[cellBCAddress];
 
-                        // Log the values for debugging
-                        const sanitizedBB = sanitizeValue(cellBB ? cellBB.v : '');
-                        const sanitizedBC = sanitizeValue(cellBC ? cellBC.v : '');
-                        console.log(`Row ${row + 1}: BB = ${sanitizedBB}, BC = ${sanitizedBC}`);
-
                         // Check for TIN number in column BB
-                        if (sanitizedBB === '10') {
+                        if (cellBB && cellBB.v === 10) {
                             // Check if column BC is a number and within 9 to 12 digits
-                            if (!/^\d{9,12}$/.test(sanitizedBC)) {
-                                errorCells.push(`Line ${row + 1}: Column BC must be a number with 9 to 12 digits when Column BB is 10. Found: ${sanitizedBC || 'undefined'}`);
+                            if (!/^\d{9,12}$/.test(cellBC ? cellBC.v : '')) {
+                                errorCells.push(`Line ${row + 1}: Column BC must be a number with 9 to 12 digits when Column BB is 10. Found: ${cellBC ? cellBC.v : 'undefined'}`);
                             }
                         }
 
@@ -143,10 +127,9 @@
                         for (let col = range.s.c; col <= range.e.c; col++) {
                             const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
                             const cell = worksheet[cellAddress];
-                            const sanitizedCellValue = sanitizeValue(cell ? cell.v : '');
 
-                            if (sanitizedCellValue && sanitizedCellValue !== cell.v) {
-                                errorCells.push(`Line ${row + 1}: Found special characters in ${cellAddress} - ${sanitizedCellValue}`); // Show line number and error
+                            if (cell && /[^a-zA-Z0-9\s]/.test(cell.v)) { // Check for any special characters
+                                errorCells.push(`Line ${row + 1}: Found special characters in ${cellAddress} - ${cell.v}`); // Show line number and error
                             }
                         }
                     }

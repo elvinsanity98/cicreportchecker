@@ -272,5 +272,67 @@
     return result;
   }
 
-  root.CIC_READERS = { checkFile: checkFile };
+  // Runs the auto-fixer over the file, then checks the corrected text.
+  // options: { fixes, mfi, onProgress }. Resolves to
+  //   { fix, after, parts, fileName, size }
+  // where `parts` are the text chunks of the corrected file (CRLF line ends),
+  // `fix` is the fixer's change log and `after` the checker result for it.
+  async function fixFile(file, options) {
+    options = options || {};
+    var FIXER = root.CIC_FIXER;
+    var kind = ext(file.name);
+    var started = Date.now();
+    var progress = options.onProgress || function () {};
+    var fixer, originalName = file.name;
+
+    if (kind === 'gpg' || kind === 'pgp' || kind === 'asc') throw new Error('This file is encrypted, so it cannot be read or fixed.');
+    if (kind === 'xls') throw new Error('Old-format .xls workbooks cannot be read. Save the workbook as .xlsx first.');
+
+    if (kind === 'xlsx' || kind === 'xlsm') {
+      var book = await readWorkbook(file);
+      fixer = FIXER.createFixer({ mode: 'excel', options: options.fixes });
+      await eachRow(book, pickSheet(book), function (cells, n) { fixer.row(cells, n); }, function (f) { progress(f * 0.6); });
+      originalName = '';
+    } else {
+      var bytes;
+      if (kind === 'zip') {
+        var entries = (await readZipDirectory(file)).filter(function (e) { return !/\/$/.test(e.name); });
+        var inner = entries.filter(function (e) { return /\.txt$/i.test(e.name); })[0] || entries[0];
+        if (!inner) throw new Error('The ZIP file is empty.');
+        originalName = inner.name.split('/').pop();
+        bytes = new Uint8Array(await new Response(await zipEntryStream(file, inner)).arrayBuffer());
+      } else {
+        bytes = new Uint8Array(await file.arrayBuffer());
+      }
+      fixer = FIXER.createFixer({ options: options.fixes });
+      var walk = FIXER.byteLines(bytes, fixer);
+      while (walk.run(4000)) {
+        progress(walk.position() / walk.total * 0.6);
+        await tick();
+      }
+    }
+
+    var fix = fixer.finish();
+    var fileName = FIXER.suggestName(fix.provider, originalName, new Date());
+    var checker = CHECKER.createChecker({ mfi: options.mfi, fileName: fileName });
+    var parts = [];
+    var size = 0;
+    for (var i = 0; i < fix.lines.length; i += 4000) {
+      var chunk = fix.lines.slice(i, i + 4000);
+      for (var k = 0; k < chunk.length; k++) checker.line(chunk[k]);
+      var text = chunk.join('\r\n') + '\r\n';
+      parts.push(text);
+      size += new Blob([text]).size;
+      progress(0.6 + 0.4 * Math.min(1, (i + 4000) / fix.lines.length));
+      await tick();
+    }
+    var after = checker.finish();
+    after.source = fileName + ' (auto-fixed copy of ' + file.name + ')';
+    after.container = fileName;
+    after.size = size;
+    after.elapsed = Date.now() - started;
+    return { fix: fix, after: after, parts: parts, fileName: fileName, size: size };
+  }
+
+  root.CIC_READERS = { checkFile: checkFile, fixFile: fixFile };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

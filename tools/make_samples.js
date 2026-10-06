@@ -11,6 +11,8 @@ const files = {
 for (const [name, lines] of Object.entries(files)) {
   const out = path.join(root, name);
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, lines.join('\r\n') + '\r\n', 'utf8');
+  // The broken sample is saved as ANSI on purpose, the way Excel and Notepad
+  // save by default, so its "Ñ" is not valid UTF-8.
+  fs.writeFileSync(out, lines.join('\r\n') + '\r\n', name.startsWith('with-errors') ? 'latin1' : 'utf8');
   console.log('wrote', path.relative(path.join(__dirname, '..'), out));
 }

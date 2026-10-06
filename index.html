@@ -136,6 +136,24 @@ main { padding-top: 20px; padding-bottom: 8px; }
 .verdict.ok h2 { color: var(--ok); } .verdict.ok .glyph { background: var(--ok); }
 .notice { margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: var(--info-soft); color: var(--ink); font-size: .92rem; border: 1px solid color-mix(in srgb, var(--info) 30%, transparent); }
 
+/* ---- auto-fix ---- */
+.fixcard { margin-top: 14px; padding: 14px 16px; }
+.fix-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 20px; flex-wrap: wrap; }
+.fix-head h3 { font-size: 1rem; font-weight: 650; }
+.fix-summary { color: var(--ink-2); margin-top: 2px; max-width: 46rem; }
+.fix-summary.bad { color: var(--error); }
+.fix-note { margin-top: 8px; color: var(--ink-3); font-size: .88rem; }
+.fix-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 28px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.fix-opt { display: flex; padding: 4px 0; font-size: .93rem; }
+.fix-opt .count { margin-left: 8px; font-size: .78rem; font-weight: 650; padding: 1px 7px; border-radius: 9px; background: var(--ok-soft); color: var(--ok); }
+.fix-group { font-size: .78rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 4px; }
+.fix-tools { margin-top: 14px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
+.lit { white-space: pre-wrap; border-radius: 3px; padding: 1px 3px; }
+.lit.old { background: var(--error-soft); }
+.lit.new { background: var(--ok-soft); }
+
 /* ---- summary cards ---- */
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .cards .card { padding: 14px 16px; }
@@ -264,6 +282,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
 
 @media (max-width: 860px) {
   .cards { grid-template-columns: 1fr; }
+  .fix-options { grid-template-columns: 1fr; }
   .group-head { grid-template-columns: 1fr auto; }
   .group-head > .sev { grid-column: 1 / -1; justify-self: start; }
 }
@@ -439,6 +458,8 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
 //   max    maximum length (only where the manuals state one)
 //   dom    code table in domains.js (array = any of several tables)
 //   soft   format problems are warnings instead of errors
+//   text   'name' = a person's name, 'free' = other free text (addresses,
+//          trade names). Used for symbol checks and the optional auto-fixes.
 (function (root) {
   function f(name, type, opts) {
     var d = { name: name, type: type || 'X' };
@@ -449,13 +470,13 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
   function address(prefix, typeDom) {
     return [
       f(prefix + ': Address Type', 'X', { dom: typeDom }),
-      f(prefix + ': FullAddress'),
-      f(prefix + ': StreetNo'),
+      f(prefix + ': FullAddress', 'X', { text: 'free' }),
+      f(prefix + ': StreetNo', 'X', { text: 'free' }),
       f(prefix + ': PostalCode'),
-      f(prefix + ': Subdivision'),
-      f(prefix + ': Barangay'),
-      f(prefix + ': City'),
-      f(prefix + ': Province'),
+      f(prefix + ': Subdivision', 'X', { text: 'free' }),
+      f(prefix + ': Barangay', 'X', { text: 'free' }),
+      f(prefix + ': City', 'X', { text: 'free' }),
+      f(prefix + ': Province', 'X', { text: 'free' }),
       f(prefix + ': Country', 'X', { dom: 'Country' }),
       f(prefix + ': House Owner/Lessee', 'X', { dom: 'HouseOwnerLessee' }),
       f(prefix + ': Occupied Since', 'D', { soft: true })
@@ -480,7 +501,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
       out.push(f(p + 'IssueDate', 'D'));
       out.push(f(p + 'IssueCountry', 'X', { dom: 'Country' }));
       out.push(f(p + 'ExpiryDate', 'D'));
-      out.push(f(p + 'Issued By'));
+      out.push(f(p + 'Issued By', 'X', { text: 'free' }));
     }
     return out;
   }
@@ -491,15 +512,15 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
       var p = 'Guarantee ' + i + ': ';
       out.push(f(p + 'Provider Guarantee No'));
       out.push(f(p + 'Provider Subject No (Guarantor)', 'X', { max: 38 }));
-      out.push(f(p + 'Guarantor Name'));
+      out.push(f(p + 'Guarantor Name', 'X', { text: 'free' }));
       out.push(f(p + 'Guaranteed Amount', 'N'));
       out.push(f(p + 'Currency', 'X', { dom: 'Currency' }));
       out.push(f(p + 'Validity Start Date', 'D'));
       out.push(f(p + 'Validity End Date', 'D'));
       out.push(f(p + 'Guarantee Type', 'X', { dom: 'Guarantees' }));
       out.push(f(p + 'Asset Code'));
-      out.push(f(p + 'Asset Description'));
-      out.push(f(p + 'Asset Location'));
+      out.push(f(p + 'Asset Description', 'X', { text: 'free' }));
+      out.push(f(p + 'Asset Location', 'X', { text: 'free' }));
       out.push(f(p + 'Asset Appraised Value', 'N'));
       out.push(f(p + 'Asset Registry External Link'));
       out.push(f(p + 'Customer Type', 'X', { dom: 'GuaranteeCustomerType' }));
@@ -513,7 +534,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
       var p = 'Linked Subject ' + i + ': ';
       out.push(f(p + 'Provider Subject No', 'X', { max: 38 }));
       out.push(f(p + 'Role', 'X', { dom: 'Role' }));
-      out.push(f(p + 'Name of the Linked Subject'));
+      out.push(f(p + 'Name of the Linked Subject', 'X', { text: 'free' }));
     }
     return out;
   }
@@ -557,31 +578,31 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
 
   var ID = common('Subject Reference Date').concat([
     f('Title', 'X', { dom: 'Title' }),
-    f('First Name', 'X', { req: 'M' }),
-    f('Last Name', 'X', { req: 'M' }),
-    f('Middle Name'),
-    f('Suffix'),
-    f('Nickname'),
-    f('Previous Last Name'),
+    f('First Name', 'X', { req: 'M', text: 'name' }),
+    f('Last Name', 'X', { req: 'M', text: 'name' }),
+    f('Middle Name', 'X', { text: 'name' }),
+    f('Suffix', 'X', { text: 'name' }),
+    f('Nickname', 'X', { text: 'name' }),
+    f('Previous Last Name', 'X', { text: 'name' }),
     f('Gender', 'X', { req: 'E', dom: 'Gender' }),
     f('Date of Birth', 'D', { req: 'M' }),
-    f('Place of Birth', 'X', { max: 100 }),
+    f('Place of Birth', 'X', { max: 100, text: 'free' }),
     f('Country of Birth (Code)', 'X', { dom: 'Country' }),
     f('Nationality', 'X', { dom: 'Country' }),
     f('Resident', 'X', { dom: 'YesNo' }),
     f('Civil Status', 'X', { dom: 'CivilStatus' }),
     f('Number of Dependents', 'N'),
     f('Car/s Owned', 'N'),
-    f('Spouse First Name'),
-    f('Spouse Last Name'),
-    f('Spouse Middle Name'),
-    f("Mother's Maiden First Name"),
-    f("Mother's Maiden Full Name"),
-    f("Mother's Maiden Middle Name"),
-    f('Father First Name'),
-    f('Father Last Name'),
-    f('Father Middle Name'),
-    f('Father Suffix')
+    f('Spouse First Name', 'X', { text: 'name' }),
+    f('Spouse Last Name', 'X', { text: 'name' }),
+    f('Spouse Middle Name', 'X', { text: 'name' }),
+    f("Mother's Maiden First Name", 'X', { text: 'name' }),
+    f("Mother's Maiden Full Name", 'X', { text: 'name' }),
+    f("Mother's Maiden Middle Name", 'X', { text: 'name' }),
+    f('Father First Name', 'X', { text: 'name' }),
+    f('Father Last Name', 'X', { text: 'name' }),
+    f('Father Middle Name', 'X', { text: 'name' }),
+    f('Father Suffix', 'X', { text: 'name' })
   ])
     .concat(address('Address 1', 'AddressTypeIndividual'))
     .concat(address('Address 2', 'AddressTypeIndividual'))
@@ -589,7 +610,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     .concat(idDocs())
     .concat(pairs('Contact', 2, 'Type', 'Value', 'ContactType'))
     .concat([
-      f('Employment: Trade Name'),
+      f('Employment: Trade Name', 'X', { text: 'free' }),
       f('Employment: TIN'),
       f('Employment: Phone Number'),
       f('Employment: PSIC', 'X', { dom: 'PSIC' }),
@@ -600,7 +621,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
       f('Employment: DateHiredFrom', 'D'),
       f('Employment: DateHiredTo', 'D'),
       f('Employment: Occupation', 'X', { dom: 'PSOC' }),
-      f('Sole Trader: TradeName')
+      f('Sole Trader: TradeName', 'X', { text: 'free' })
     ])
     // The workbook lists MI/AI for individuals and MT/AT for companies and does
     // not say which a sole trader's business address takes, so accept both.
@@ -610,8 +631,8 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     .concat(pairs('Sole Trader Contact', 2, 'Type', 'Value', 'ContactType'));
 
   var BD = common('Subject Reference Date').concat([
-    f('Trade Name', 'X', { req: 'M' }),
-    f('Official registered Trade Name'),
+    f('Trade Name', 'X', { req: 'M', text: 'free' }),
+    f('Official registered Trade Name', 'X', { text: 'free' }),
     f('Nationality', 'X', { dom: 'Country' }),
     f('Resident', 'X', { dom: 'YesNo' }),
     f('Legal Form', 'X', { dom: 'LegalForm' }),
@@ -652,7 +673,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     f('Good Type', 'X', { dom: 'GoodType' }),
     f('Good Value', 'N'),
     f('New/Used Code', 'X', { dom: 'NewUsed' }),
-    f('Good Brand'),
+    f('Good Brand', 'X', { text: 'free' }),
     f('Manufacturing Date', 'D', { soft: true }),
     f('Registration number')
   ]).concat(guarantees()).concat(linkedSubjects());
@@ -712,7 +733,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
 
   var NE = common('Negative Event Reference Date').concat([
     f('Event Code', 'X', { req: 'M', dom: 'SubjectInfoType' }),
-    f('Event Detail'),
+    f('Event Detail', 'X', { text: 'free' }),
     f('Event Date', 'D', { req: 'E' }),
     f('Event Status', 'X', { dom: 'EventStatus' }),
     f('Event Status Date', 'D')
@@ -810,6 +831,9 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     'V-SPACE':      { sev: 'warning', basis: 'practice', title: 'Value has leading or trailing spaces' },
     'V-CHAR':       { sev: 'error',   basis: 'practice', title: 'Value contains tab or control characters' },
     'V-QUOTE':      { sev: 'warning', basis: 'practice', title: 'Value is wrapped in double quotes' },
+    'V-DSPACE':     { sev: 'warning', basis: 'practice', title: 'Value has double spaces' },
+    'V-ODD':        { sev: 'warning', basis: 'practice', title: 'Value has non-standard or garbled characters' },
+    'V-NAME':       { sev: 'warning', basis: 'practice', title: 'Name contains digits or symbols' },
     'H-VERSION':    { sev: 'error',   basis: 'manual',   title: 'Version must be 1.0' },
     'H-SUBTYPE':    { sev: 'error',   basis: 'manual',   title: 'Submission Type must be 0 or 1' },
     'H-PROV':       { sev: 'warning', basis: 'manual',   title: 'Provider Code is not 8 alphanumeric characters' },
@@ -831,6 +855,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     'C-IDENT':      { sev: 'warning', basis: 'practice', title: 'No identification number or ID document' },
     'C-CONTACT':    { sev: 'warning', basis: 'practice', title: 'No contact details' },
     'C-EMAIL':      { sev: 'warning', basis: 'practice', title: 'E-mail contact does not look like an e-mail address' },
+    'C-TIN':        { sev: 'error',   basis: 'practice', title: 'TIN must be 9 to 12 digits' },
     'C-PHASE':      { sev: 'warning', basis: 'practice', title: 'Dates do not fit the Contract Phase' },
     'C-DATES':      { sev: 'warning', basis: 'practice', title: 'Dates are out of order' },
     'C-OVERDUE':    { sev: 'warning', basis: 'practice', title: 'Overdue number and overdue amount disagree' }
@@ -841,6 +866,34 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
   var CONTRACT_TYPES = { CI: 1, CN: 1, CC: 1, CS: 1 };
+
+  // Characters that look fine on screen but are not plain text: non-breaking
+  // and other odd spaces, zero-width marks, curly quotes, long dashes.
+  var ODD_CHARS = /[\u007f-\u00a0\u00ad\u1680\u2000-\u200d\u2010-\u2015\u2018-\u201f\u2026\u2028\u2029\u202f\u2032\u2033\u205f\u2060\u3000\ufeff]/g;
+  // UTF-8 text that was opened as ANSI and saved again, e.g. "\u00c3\u2018" for "\u00d1".
+  var GARBLED = /[\u00c2-\u00f4][\u0080-\u00bf\u2018-\u203a\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc\u20ac\u2122]/;
+  // U+FFFD is left out: a line with broken bytes is already reported as F-UTF8.
+  var NAME_SYMBOLS = /[^\p{L}\p{M} .'\-\ufffd]/gu;
+  var ODD_NAMES = {
+    '\u00a0': 'non-breaking space', '\u00ad': 'soft hyphen', '\u200b': 'zero-width space', '\ufeff': 'zero-width mark',
+    '\u2018': 'curly quote', '\u2019': 'curly quote', '\u201c': 'curly double quote', '\u201d': 'curly double quote',
+    '\u2013': 'long dash', '\u2014': 'long dash', '\u2026': 'ellipsis character'
+  };
+  // Identification fields as 0-based [type, number] index pairs, plus plain TIN fields.
+  var TIN_FIELDS = {
+    ID: { pairs: [[53, 54], [55, 56], [57, 58], [115, 116], [117, 118]], plain: [82] },
+    BD: { pairs: [[41, 42], [43, 44]], plain: [] }
+  };
+  var TIN_RE = /^\d{9,12}$/;
+
+  function describeOdd(val) {
+    var seen = {}, out = [];
+    (val.match(ODD_CHARS) || []).forEach(function (ch) {
+      var label = ODD_NAMES[ch] || 'U+' + ('000' + ch.charCodeAt(0).toString(16).toUpperCase()).slice(-4);
+      if (!seen[label]) { seen[label] = true; out.push(label); }
+    });
+    return out.join(', ');
+  }
 
   // ---- helpers ---------------------------------------------------------
 
@@ -917,7 +970,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
         var names = def.dom ? [].concat(def.dom) : def.orDom ? [def.orDom] : [];
         return {
           name: def.name, type: def.type, req: def.req || '', max: def.max || 0,
-          soft: !!def.soft, refDate: !!def.refDate, numeric: def.type === 'N',
+          soft: !!def.soft, refDate: !!def.refDate, numeric: def.type === 'N', text: def.text || '',
           strictDom: !!def.dom, doms: names.map(domainSet)
         };
       });
@@ -1055,6 +1108,20 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
         if (val.length > 1 && val.charAt(0) === '"' && val.charAt(val.length - 1) === '"') {
           add('V-QUOTE', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Excel adds quotes when a cell contains a quote or the list separator. Remove them.' });
         }
+        if (val.indexOf('  ') >= 0) {
+          add('V-DSPACE', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Use a single space between words.' });
+        }
+        if (GARBLED.test(val)) {
+          add('V-ODD', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Looks like damaged encoding, such as "\u00c3\u2018" where "\u00d1" was meant. Auto-fix can repair it.' });
+        } else if (val.search(ODD_CHARS) >= 0) {
+          add('V-ODD', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Contains ' + describeOdd(val) + '. Type plain spaces, quotes and hyphens instead.' });
+        }
+        if (def.text === 'name') {
+          var odd = val.match(NAME_SYMBOLS);
+          if (odd) {
+            add('V-NAME', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Found ' + odd.filter(function (c, k) { return odd.indexOf(c) === k; }).join(' ') + '. Names normally hold only letters, spaces, hyphen, apostrophe and period.' });
+          }
+        }
         if (def.max && val.length > def.max) {
           add('V-LEN', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: val.length + ' characters; maximum is ' + def.max + '.' });
         }
@@ -1107,6 +1174,20 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
       add('C-PAIR', {
         line: line, rec: type, pos: missing + 1, fields: fields,
         msg: defs[missing].name + ' is empty but ' + defs[v[iType] ? iType : iValue].name + ' is filled.'
+      });
+    }
+
+    function tinCheck(type, line, fields, v, defs) {
+      var spec = TIN_FIELDS[type];
+      var targets = spec.plain.slice();
+      spec.pairs.forEach(function (pair) { if (v[pair[0]] === '10') targets.push(pair[1]); });
+      targets.forEach(function (idx) {
+        if (!v[idx] || TIN_RE.test(v[idx])) return;
+        var digits = v[idx].replace(/\D/g, '').length;
+        add('C-TIN', {
+          line: line, rec: type, pos: idx + 1, value: v[idx], fields: fields,
+          msg: defs[idx].name + ' holds a TIN: digits only, 9 to 12 of them, no dashes or spaces. Found ' + digits + ' digit(s)' + (digits === v[idx].length ? '.' : ' plus other characters.')
+        });
       });
     }
 
@@ -1192,6 +1273,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
       addressCheck('ID', line, fields, v, 104, false);
       for (k = 0; k < 2; k++) pairCheck('ID', line, fields, v, 115 + k * 2, 116 + k * 2, defs);
       contactCheck('ID', line, fields, v, 119, 2, defs);
+      tinCheck('ID', line, fields, v, defs);
     }
 
     function checkBD(line, fields, r, defs) {
@@ -1207,6 +1289,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
         add('C-IDENT', { line: line, rec: 'BD', pos: 42, fields: fields, msg: 'Give at least one Identification (TIN, SEC, DTI or CDA registration number).' });
       }
       contactCheck('BD', line, fields, v, 45, 2, defs);
+      tinCheck('BD', line, fields, v, defs);
     }
 
     function checkContract(type, line, fields, r, defs) {
@@ -1421,7 +1504,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
         }
         if (!text.trim()) { st.blanks.push(n); return; }
         flushBlanks(false);
-        if (text.indexOf('�') >= 0) {
+        if (text.indexOf('\ufffd') >= 0) {
           add('F-UTF8', { line: n, value: text.slice(0, 60), msg: 'Contains bytes that are not UTF-8, usually Ñ or accented letters from a file saved as ANSI. Re-save the text file with UTF-8 encoding.' });
         }
         if (text.indexOf('|') < 0) {
@@ -1554,7 +1637,483 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     createLineFeeder: createLineFeeder,
     RULES: RULES,
     colLetter: colLetter,
-    parseDate: parseDate
+    parseDate: parseDate,
+    // Shared with the auto-fixer.
+    fieldDefs: COMPILED,
+    domainMatch: domainMatch,
+    stripZeros: stripZeros,
+    validYMD: validYMD,
+    GARBLED: GARBLED,
+    TIN_FIELDS: TIN_FIELDS,
+    TIN_RE: TIN_RE,
+    FILE_NAME_RE: FILE_NAME_RE
+  };
+});
+</script>
+<script>
+// Auto-fixer for CIC Submission Data Files. Produces a corrected copy of the
+// file plus a log of every change, so nothing is altered silently.
+//
+// Only repairs that need no guessing are made: a value is rewritten when there
+// is exactly one thing it can mean. Missing values, wrong codes and duplicates
+// are left for a person to decide.
+//
+//   var fx = createFixer({ options: { symbols: true } });
+//   feedBytes(fx, bytes);            // or fx.line(text) / fx.row(cells, n)
+//   var out = fx.finish();           // out.lines, out.changes, out.counts
+(function (root, factory) {
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = factory(require('./checker.js'), require('./domains.js'));
+  } else {
+    root.CIC_FIXER = factory(root.CIC_CHECKER, root.CIC_DOMAINS);
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (CHECKER, DOM) {
+  'use strict';
+
+  // Each kind can be switched off, except `encoding`: the output is always
+  // written as UTF-8 without BOM. `optional` kinds change the data itself and
+  // are off unless asked for.
+  var KINDS = [
+    { id: 'encoding', always: true, label: 'Save as UTF-8 without BOM', detail: 'Keeps Ñ and accented letters readable when the file was saved as ANSI, and repairs garbled sequences such as Ã\u2018.' },
+    { id: 'structure', label: 'Remove label rows and blank lines; even out the field count', detail: 'Adds or drops empty fields at the end of a record so it matches the layout.' },
+    { id: 'delimiter', label: 'Turn comma-delimited lines into pipe-delimited' },
+    { id: 'spaces', label: 'Trim values and collapse double spaces', detail: 'Also replaces tabs, line breaks and non-breaking spaces with a plain space.' },
+    { id: 'punctuation', label: 'Remove quotes added by Excel; straighten curly quotes and long dashes' },
+    { id: 'codes', label: 'Upper-case codes and swap a description for its code', detail: 'For example m → M, PHILIPPINES → PH.' },
+    { id: 'dates', label: 'Rewrite dates as DDMMYYYY when there is only one way to read them', detail: 'Restores a leading zero dropped by Excel, reorders 2026-06-30 or 06302026, converts Excel date numbers.' },
+    { id: 'numbers', label: 'Clean numbers', detail: 'Removes thousands separators, spaces, a peso sign and a trailing .00.' },
+    { id: 'tin', label: 'TIN: keep the digits only', detail: 'Removes dashes and spaces from a TIN.' },
+    { id: 'header', label: 'Header version 1 → 1.0; recount the footer' },
+    { id: 'enye', optional: true, label: 'Replace Ñ and accented letters with plain letters', detail: 'Ñ → N, é → e, in names, addresses and trade names. Leave off to keep Ñ; CIC accepts it in a UTF-8 file.' },
+    { id: 'symbols', optional: true, label: 'Remove symbols from names, addresses and trade names', detail: 'Keeps letters, digits and spaces. Periods, commas, hyphens and # become a space, apostrophes are dropped, & becomes AND.' }
+  ];
+  var KIND_LABEL = {};
+  KINDS.forEach(function (k) { KIND_LABEL[k.id] = k.label; });
+
+  function defaultOptions() {
+    var o = {};
+    KINDS.forEach(function (k) { o[k.id] = !k.optional; });
+    return o;
+  }
+
+  // Printable ASCII with single inner spaces, no space at either end and no
+  // leading quote: nothing for the character-level fixes to do.
+  var PLAIN = /^[!#-~](?:[!-~]| (?=[!-~]))*$/;
+  var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  var CONTROL = /[\u0000-\u001f\u007f-\u009f]+/g;
+  var ODD_SPACE = /[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g;
+  var ZERO_WIDTH = /[\u200b-\u200d\u2060\ufeff\u00ad]/g;
+  var CURLY_SINGLE = /[\u2018\u2019\u201a\u201b\u2032\u00b4]/g;
+  var CURLY_DOUBLE = /[\u201c\u201d\u201e\u201f\u2033]/g;
+  var LONG_DASH = /[\u2010-\u2015\u2212]/g;
+  var NON_ASCII = /[^\u0000-\u007f]/;
+
+  // Windows-1252 code points for bytes 0x80-0x9F, to turn text back into bytes.
+  var CP1252 = [0x20ac, 0x81, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039, 0x0152, 0x8d, 0x017d, 0x8f,
+    0x90, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x9d, 0x017e, 0x0178];
+  var CP1252_BYTE = {};
+  CP1252.forEach(function (cp, i) { CP1252_BYTE[cp] = 0x80 + i; });
+
+  var utf8Strict = new TextDecoder('utf-8', { fatal: true });
+  var utf8Loose = new TextDecoder('utf-8');
+  var ansi = null;
+  function ansiDecoder() {
+    if (!ansi) ansi = new TextDecoder('windows-1252');
+    return ansi;
+  }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function ddmmyyyy(y, m, d) { return pad2(d) + pad2(m) + ('000' + y).slice(-4); }
+  function plausibleYear(y) { return y >= 1900 && y <= 2100; }
+
+  // "PEÃ\u2018A" -> "PEÑA": re-read the characters as the bytes they came from.
+  function repairGarbled(s) {
+    if (!CHECKER.GARBLED.test(s)) return s;
+    var bytes = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      var b = c < 0x80 || (c >= 0xa0 && c <= 0xff) ? c : CP1252_BYTE[c];
+      if (b === undefined) return s;
+      bytes[i] = b;
+    }
+    try {
+      var fixed = utf8Strict.decode(bytes);
+      return fixed.length < s.length ? fixed : s;
+    } catch (e) {
+      return s;
+    }
+  }
+
+  // Returns the DDMMYYYY form, or null when the value is fine or ambiguous.
+  function fixDate(s) {
+    if (CHECKER.parseDate(s).ok) return null;
+    var valid = CHECKER.validYMD;
+    var t = s.replace(/[ T]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?( ?[AaPp][Mm])?$/, '');
+    var m;
+    if (t !== s && CHECKER.parseDate(t).ok) return t;
+    if (/^\d{7}$/.test(t)) {
+      var padded = '0' + t;
+      return CHECKER.parseDate(padded).ok && plausibleYear(+padded.slice(4)) ? padded : null;
+    }
+    if (/^\d{8}$/.test(t)) {
+      var iso = valid(+t.slice(0, 4), +t.slice(4, 6), +t.slice(6)) && plausibleYear(+t.slice(0, 4));
+      var us = valid(+t.slice(4), +t.slice(0, 2), +t.slice(2, 4)) && plausibleYear(+t.slice(4));
+      if (iso && !us) return t.slice(6) + t.slice(4, 6) + t.slice(0, 4);
+      if (us && !iso) return t.slice(2, 4) + t.slice(0, 2) + t.slice(4);
+      return null;
+    }
+    if (/^\d{5}$/.test(t) && +t > 10000 && +t < 80000) {
+      // Excel serial date: days since 30 Dec 1899.
+      var day = new Date(Date.UTC(1899, 11, 30) + +t * 86400000);
+      return ddmmyyyy(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate());
+    }
+    if ((m = /^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/.exec(t))) {
+      return valid(+m[1], +m[2], +m[3]) && plausibleYear(+m[1]) ? ddmmyyyy(+m[1], +m[2], +m[3]) : null;
+    }
+    if ((m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(t))) {
+      var y = +m[3], a = +m[1], b = +m[2];
+      if (!plausibleYear(y)) return null;
+      var dayFirst = valid(y, b, a), monthFirst = valid(y, a, b);
+      if (dayFirst && (!monthFirst || a === b)) return ddmmyyyy(y, b, a);
+      if (monthFirst && !dayFirst) return ddmmyyyy(y, a, b);
+      return null;
+    }
+    if ((m = /^(\d{1,2})[\-\s.]([A-Za-z]{3,9})[\-\s.,]+(\d{4})$/.exec(t)) || (m = /^()([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(t))) {
+      var dd = m[1] ? +m[1] : +m[3];
+      var yy = m[1] ? +m[3] : +m[4];
+      var mm = MONTHS[m[2].slice(0, 3).toLowerCase()];
+      return mm && valid(yy, mm, dd) && plausibleYear(yy) ? ddmmyyyy(yy, mm, dd) : null;
+    }
+    return null;
+  }
+
+  // Returns the cleaned number, or null when nothing can safely change.
+  function fixNumber(s) {
+    if (/^\d+$/.test(s)) return null;
+    var t = s.replace(/^(php|₱|p)\s*(?=\d)/i, '').replace(/\s+/g, '');
+    // Commas are dropped only when they group thousands: "12,5" may be a decimal comma.
+    if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, '');
+    t = t.replace(/^(\d+)\.0+$/, '$1');
+    return t !== s && /^\d+(\.\d+)?$/.test(t) ? t : null;
+  }
+
+  function fixTin(s) {
+    if (CHECKER.TIN_RE.test(s) || /[^\d\s.\-]/.test(s)) return null;
+    var t = s.replace(/\D/g, '');
+    return CHECKER.TIN_RE.test(t) ? t : null;
+  }
+
+  function stripAccents(s) {
+    return NON_ASCII.test(s) ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
+  }
+
+  function stripSymbols(s) {
+    return s.replace(/&/g, ' AND ').replace(/['\u2019]/g, '').replace(/[^\p{L}\p{M}\p{N} ]/gu, ' ').replace(/ {2,}/g, ' ').trim();
+  }
+
+  // Description -> code, per code table. A description shared by two codes maps to nothing.
+  var byDescription = {};
+  function codeForDescription(def, value) {
+    var key = value.toUpperCase().replace(/\s+/g, ' ');
+    var found = null;
+    for (var i = 0; i < def.doms.length; i++) {
+      var name = def.doms[i].name;
+      var map = byDescription[name];
+      if (!map) {
+        map = byDescription[name] = {};
+        var table = DOM.DOMAINS[name];
+        Object.keys(table).forEach(function (code) {
+          var d = table[code].toUpperCase().replace(/\s+/g, ' ');
+          map[d] = d in map ? null : code;
+        });
+      }
+      if (map[key]) {
+        if (found && found !== map[key]) return null;
+        found = map[key];
+      }
+    }
+    return found;
+  }
+
+  // RFC 4180 style split of one comma-delimited line.
+  function splitCsv(line) {
+    var out = [], cur = '', quoted = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line.charAt(i);
+      if (quoted) {
+        if (ch === '"') {
+          if (line.charAt(i + 1) === '"') { cur += '"'; i++; } else quoted = false;
+        } else cur += ch;
+      } else if (ch === '"' && cur === '') quoted = true;
+      else if (ch === ',') { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return quoted ? null : out;
+  }
+
+  function createFixer(opts) {
+    opts = opts || {};
+    var on = defaultOptions();
+    for (var key in opts.options || {}) if (key in on) on[key] = !!opts.options[key];
+    on.encoding = true;
+    var excel = opts.mode === 'excel';
+    var maxChanges = opts.maxChanges || 20000;
+
+    var st = {
+      lines: [], changes: [], counts: {}, total: 0, changed: {}, changedLines: 0, truncated: false,
+      lineNo: 0, footerAt: -1, footerFields: null, provider: '', removed: 0
+    };
+    KINDS.forEach(function (k) { st.counts[k.id] = 0; });
+
+    function log(kind, line, rec, pos, field, before, after, note) {
+      st.counts[kind]++;
+      st.total++;
+      if (line && !st.changed[line]) { st.changed[line] = true; st.changedLines++; }
+      if (st.changes.length >= maxChanges) { st.truncated = true; return; }
+      st.changes.push({ kind: kind, line: line, rec: rec || '', pos: pos || 0, field: field || '', before: before, after: after, note: note || '' });
+    }
+
+    // Fixes that apply to any value, whatever the field.
+    function generic(value, line, rec, pos, name) {
+      var v = value, next;
+      if (on.encoding) {
+        next = repairGarbled(v);
+        if (next !== v) { log('encoding', line, rec, pos, name, v, next, 'Garbled characters repaired'); v = next; }
+      }
+      if (on.punctuation && v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') {
+        next = v.slice(1, -1).replace(/""/g, '"');
+        log('punctuation', line, rec, pos, name, v, next, 'Excel quotes removed');
+        v = next;
+      }
+      if (on.spaces) {
+        next = v.replace(CONTROL, ' ').replace(ODD_SPACE, ' ').replace(ZERO_WIDTH, '').trim().replace(/ {2,}/g, ' ');
+        if (next !== v) { log('spaces', line, rec, pos, name, v, next, 'Spaces tidied'); v = next; }
+      }
+      if (on.punctuation) {
+        next = v.replace(CURLY_SINGLE, "'").replace(CURLY_DOUBLE, '"').replace(LONG_DASH, '-').replace(/\u2026/g, '...');
+        if (next !== v) { log('punctuation', line, rec, pos, name, v, next, 'Curly quotes or long dashes straightened'); v = next; }
+      }
+      return v;
+    }
+
+    function typed(def, value, line, rec, pos) {
+      var v = value, next;
+      if (!v) return v;
+      if (def.type === 'D') {
+        if (on.dates && (next = fixDate(v))) { log('dates', line, rec, pos, def.name, v, next, 'Rewritten as DDMMYYYY'); v = next; }
+      } else if (def.numeric) {
+        var isCode = def.doms.length && CHECKER.domainMatch(def, v) === 'ok';
+        if (on.numbers && !isCode && (next = fixNumber(v))) { log('numbers', line, rec, pos, def.name, v, next, 'Number cleaned'); v = next; }
+      } else if (def.strictDom) {
+        if (on.codes) {
+          var match = CHECKER.domainMatch(def, v);
+          next = null;
+          if (match === 'case') next = v.toUpperCase();
+          else if (match === 'no') {
+            var bare = CHECKER.stripZeros(v.replace(/\.0+$/, ''));
+            if (bare !== v && CHECKER.domainMatch(def, bare) === 'ok') next = bare;
+            else next = codeForDescription(def, v);
+          }
+          if (next && next !== v) { log('codes', line, rec, pos, def.name, v, next, match === 'case' ? 'Upper-cased' : 'Replaced by its code'); v = next; }
+        }
+      } else if (def.text) {
+        if (on.enye && (next = stripAccents(v)) !== v) { log('enye', line, rec, pos, def.name, v, next, 'Accents removed'); v = next; }
+        if (on.symbols && (next = stripSymbols(v)) !== v) { log('symbols', line, rec, pos, def.name, v, next, 'Symbols removed'); v = next; }
+      }
+      return v;
+    }
+
+    function record(fields, line) {
+      var rawType = (fields[0] || '').trim();
+      var type = rawType;
+      var defs = CHECKER.fieldDefs[type];
+      if (!defs && on.codes && CHECKER.fieldDefs[rawType.toUpperCase()]) {
+        type = rawType.toUpperCase();
+        defs = CHECKER.fieldDefs[type];
+        log('codes', line, type, 1, 'Record Type', fields[0], type, 'Upper-cased');
+        fields[0] = type;
+      }
+      var i;
+      for (i = 0; i < fields.length; i++) {
+        var raw = fields[i];
+        // Most fields are empty and most values are already plain, so skip
+        // the character-level passes for those.
+        if (raw === undefined || raw === '') { fields[i] = ''; continue; }
+        var def = defs && defs[i];
+        var v = PLAIN.test(raw) ? raw : generic(raw, line, type, i + 1, def ? def.name : '');
+        fields[i] = def ? typed(def, v, line, type, i + 1) : v;
+      }
+      if (!defs) { st.lines.push(fields.join('|')); return; }
+
+      if (on.tin && CHECKER.TIN_FIELDS[type]) {
+        var spec = CHECKER.TIN_FIELDS[type];
+        var targets = spec.plain.slice();
+        spec.pairs.forEach(function (pair) { if (fields[pair[0]] === '10') targets.push(pair[1]); });
+        targets.forEach(function (idx) {
+          var fixed = fields[idx] ? fixTin(fields[idx]) : null;
+          if (fixed) { log('tin', line, type, idx + 1, defs[idx].name, fields[idx], fixed, 'Digits only'); fields[idx] = fixed; }
+        });
+      }
+      if (type === 'HD') {
+        if (on.header && fields[3] && fields[3] !== '1.0' && Number(fields[3].replace(',', '.')) === 1) {
+          log('header', line, 'HD', 4, 'Version', fields[3], '1.0', 'Version restored');
+          fields[3] = '1.0';
+        }
+        if (!st.provider) st.provider = fields[1] || '';
+      }
+
+      if (fields.length !== defs.length && (on.structure || excel)) {
+        var extra = false;
+        for (i = defs.length; i < fields.length; i++) if (fields[i]) { extra = true; break; }
+        if (!extra) {
+          // Excel rows are always shorter or longer than the layout; evening
+          // them out is how the text file is built, not a correction.
+          if (!excel) log('structure', line, type, 0, '', fields.length + ' fields', defs.length + ' fields', fields.length < defs.length ? 'Empty fields added at the end' : 'Extra empty fields removed');
+          while (fields.length < defs.length) fields.push('');
+          fields.length = defs.length;
+        }
+      }
+      if (type === 'FT' && st.footerAt < 0) {
+        st.footerAt = st.lines.length;
+        st.footerFields = fields;
+        st.footerLine = line;
+      }
+      st.lines.push(fields.join('|'));
+    }
+
+    return {
+      // One decoded line of the text file. `reencoded` is true when the line
+      // was not valid UTF-8 and had to be read as ANSI.
+      line: function (text, reencoded) {
+        var n = ++st.lineNo;
+        if (text.charCodeAt(text.length - 1) === 13) text = text.slice(0, -1);
+        if (n === 1 && text.charCodeAt(0) === 0xfeff) {
+          text = text.slice(1);
+          log('encoding', 1, '', 0, '', 'UTF-8 with BOM', 'UTF-8', 'Byte-order mark removed');
+        }
+        if (reencoded) log('encoding', n, '', 0, '', 'ANSI', 'UTF-8', 'Line re-saved as UTF-8');
+        if (!text.trim()) {
+          if (on.structure) log('structure', n, '', 0, '', '(blank line)', '(removed)', 'Blank line removed');
+          else st.lines.push(text);
+          return;
+        }
+        var fields;
+        if (text.indexOf('|') < 0) {
+          fields = on.delimiter && /^"?[A-Za-z]{2}"?,/.test(text) ? splitCsv(text) : null;
+          if (!fields) { st.lines.push(text); return; }
+          for (var i = 0; i < fields.length; i++) fields[i] = fields[i].replace(/\|/g, ' ');
+          log('delimiter', n, '', 0, '', 'comma-delimited', 'pipe-delimited', 'Delimiter changed');
+        } else {
+          fields = text.split('|');
+        }
+        if (/^record type$/i.test(fields[0].trim()) && on.structure) {
+          log('structure', n, '', 0, '', fields.slice(0, 3).join('|') + '\u2026', '(removed)', 'Label row removed');
+          return;
+        }
+        record(fields, n);
+      },
+
+      // One row of the Excel sheet. Label rows and rows without a record type
+      // are left out: they are not part of the submission file.
+      row: function (cells, rowNumber) {
+        st.lineNo = rowNumber;
+        var first = (cells[0] || '').trim();
+        var has = false;
+        for (var i = 0; i < cells.length; i++) if (cells[i] && cells[i].trim()) { has = true; break; }
+        if (!has) return;
+        if (!first || /^record type$/i.test(first)) { st.removed++; return; }
+        var end = cells.length;
+        while (end > 0 && !(cells[end - 1] && cells[end - 1].trim())) end--;
+        var fields = cells.slice(0, end);
+        for (var k = 0; k < fields.length; k++) {
+          if (fields[k] === undefined) fields[k] = '';
+          else if (fields[k].indexOf('|') >= 0) {
+            var clean = fields[k].replace(/\|/g, ' ');
+            log('structure', rowNumber, first, k + 1, '', fields[k], clean, 'Pipe inside a cell replaced by a space');
+            fields[k] = clean;
+          }
+        }
+        record(fields, rowNumber);
+      },
+
+      finish: function () {
+        var records = 0;
+        for (var i = 0; i < st.lines.length; i++) if (st.lines[i].trim()) records++;
+        if (on.header && st.footerFields && st.footerFields[3] !== String(records)) {
+          log('header', st.footerLine, 'FT', 4, 'No. of records', st.footerFields[3], String(records), 'Footer recounted');
+          st.footerFields[3] = String(records);
+          st.lines[st.footerAt] = st.footerFields.join('|');
+        }
+        return {
+          lines: st.lines, records: records, changes: st.changes, counts: st.counts, total: st.total,
+          changedLines: st.changedLines, truncated: st.truncated, provider: st.provider,
+          skippedRows: st.removed, options: on, mode: excel ? 'excel' : 'text'
+        };
+      }
+    };
+  }
+
+  // Walks the raw bytes of a text file line by line. Lines that are not valid
+  // UTF-8 are read as Windows-1252 (ANSI), which is what Excel and Notepad
+  // write by default. Call run(n) until it returns false.
+  function byteLines(bytes, fixer) {
+    var pos = bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
+    var first = pos === 3;
+    var len = bytes.length;
+    return {
+      total: len,
+      position: function () { return pos; },
+      run: function (count) {
+        while (count-- > 0 && pos < len) {
+          var end = bytes.indexOf(10, pos);
+          if (end < 0) end = len;
+          var high = false;
+          for (var i = pos; i < end; i++) if (bytes[i] > 127) { high = true; break; }
+          var slice = bytes.subarray(pos, end);
+          var text, reencoded = false;
+          if (!high) text = utf8Loose.decode(slice);
+          else {
+            try { text = utf8Strict.decode(slice); } catch (e) { text = ansiDecoder().decode(slice); reencoded = true; }
+          }
+          if (first) { text = '\ufeff' + text; first = false; }
+          fixer.line(text, reencoded);
+          pos = end + 1;
+        }
+        return pos < len;
+      }
+    };
+  }
+
+  function feedBytes(fixer, bytes) {
+    var it = byteLines(bytes, fixer);
+    while (it.run(100000)) { /* keep going */ }
+  }
+
+  // <ProviderCode>_CSDF_<now>.txt. A corrected file is a new file, so it gets
+  // a new timestamp, which also keeps the browser from renaming a duplicate.
+  function suggestName(provider, originalName, now) {
+    var m = CHECKER.FILE_NAME_RE.exec(originalName || '');
+    var code = /^[A-Za-z0-9]{8}$/.test(provider || '') ? provider : m ? m[1] : '';
+    if (!code) return (originalName || 'file').replace(/\.[^.]+$/, '') + '_fixed.txt';
+    now = now || new Date();
+    return code + '_CSDF_' + now.getFullYear() + pad2(now.getMonth() + 1) + pad2(now.getDate()) +
+      pad2(now.getHours()) + pad2(now.getMinutes()) + pad2(now.getSeconds()) + '.txt';
+  }
+
+  return {
+    KINDS: KINDS,
+    KIND_LABEL: KIND_LABEL,
+    defaultOptions: defaultOptions,
+    createFixer: createFixer,
+    byteLines: byteLines,
+    feedBytes: feedBytes,
+    suggestName: suggestName,
+    fixDate: fixDate,
+    fixNumber: fixNumber,
+    fixTin: fixTin,
+    repairGarbled: repairGarbled,
+    stripSymbols: stripSymbols,
+    stripAccents: stripAccents
   };
 });
 </script>
@@ -1833,7 +2392,69 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     return result;
   }
 
-  root.CIC_READERS = { checkFile: checkFile };
+  // Runs the auto-fixer over the file, then checks the corrected text.
+  // options: { fixes, mfi, onProgress }. Resolves to
+  //   { fix, after, parts, fileName, size }
+  // where `parts` are the text chunks of the corrected file (CRLF line ends),
+  // `fix` is the fixer's change log and `after` the checker result for it.
+  async function fixFile(file, options) {
+    options = options || {};
+    var FIXER = root.CIC_FIXER;
+    var kind = ext(file.name);
+    var started = Date.now();
+    var progress = options.onProgress || function () {};
+    var fixer, originalName = file.name;
+
+    if (kind === 'gpg' || kind === 'pgp' || kind === 'asc') throw new Error('This file is encrypted, so it cannot be read or fixed.');
+    if (kind === 'xls') throw new Error('Old-format .xls workbooks cannot be read. Save the workbook as .xlsx first.');
+
+    if (kind === 'xlsx' || kind === 'xlsm') {
+      var book = await readWorkbook(file);
+      fixer = FIXER.createFixer({ mode: 'excel', options: options.fixes });
+      await eachRow(book, pickSheet(book), function (cells, n) { fixer.row(cells, n); }, function (f) { progress(f * 0.6); });
+      originalName = '';
+    } else {
+      var bytes;
+      if (kind === 'zip') {
+        var entries = (await readZipDirectory(file)).filter(function (e) { return !/\/$/.test(e.name); });
+        var inner = entries.filter(function (e) { return /\.txt$/i.test(e.name); })[0] || entries[0];
+        if (!inner) throw new Error('The ZIP file is empty.');
+        originalName = inner.name.split('/').pop();
+        bytes = new Uint8Array(await new Response(await zipEntryStream(file, inner)).arrayBuffer());
+      } else {
+        bytes = new Uint8Array(await file.arrayBuffer());
+      }
+      fixer = FIXER.createFixer({ options: options.fixes });
+      var walk = FIXER.byteLines(bytes, fixer);
+      while (walk.run(4000)) {
+        progress(walk.position() / walk.total * 0.6);
+        await tick();
+      }
+    }
+
+    var fix = fixer.finish();
+    var fileName = FIXER.suggestName(fix.provider, originalName, new Date());
+    var checker = CHECKER.createChecker({ mfi: options.mfi, fileName: fileName });
+    var parts = [];
+    var size = 0;
+    for (var i = 0; i < fix.lines.length; i += 4000) {
+      var chunk = fix.lines.slice(i, i + 4000);
+      for (var k = 0; k < chunk.length; k++) checker.line(chunk[k]);
+      var text = chunk.join('\r\n') + '\r\n';
+      parts.push(text);
+      size += new Blob([text]).size;
+      progress(0.6 + 0.4 * Math.min(1, (i + 4000) / fix.lines.length));
+      await tick();
+    }
+    var after = checker.finish();
+    after.source = fileName + ' (auto-fixed copy of ' + file.name + ')';
+    after.container = fileName;
+    after.size = size;
+    after.elapsed = Date.now() - started;
+    return { fix: fix, after: after, parts: parts, fileName: fileName, size: size };
+  }
+
+  root.CIC_READERS = { checkFile: checkFile, fixFile: fixFile };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script>
@@ -1842,6 +2463,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
 (function () {
   'use strict';
   var CHECKER = window.CIC_CHECKER, SPEC = window.CIC_SPEC, DOMAINS = window.CIC_DOMAINS, READERS = window.CIC_READERS;
+  var FIXER = window.CIC_FIXER;
   var SEVS = ['error', 'warning', 'info'];
   var SEV_LABEL = { error: 'Error', warning: 'Warning', info: 'Note' };
   var SEV_PLURAL = { error: 'Errors', warning: 'Warnings', info: 'Notes' };
@@ -1850,7 +2472,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
   var state = {
     file: null, result: null, runId: 0,
     sev: { error: true, warning: true, info: true }, rec: '', q: '', view: 'rule', page: 0,
-    open: {}, shown: {}, byGroup: {}, byLine: null
+    open: {}, shown: {}, byGroup: {}, byLine: null, fix: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -1958,12 +2580,14 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     state.shown = {};
     state.byLine = null;
     state.byGroup = {};
+    state.fix = null;
     r.issues.forEach(function (i) { (state.byGroup[i.group] || (state.byGroup[i.group] = [])).push(i); });
     SEVS.forEach(function (s) { state.sev[s] = true; });
     $('empty').hidden = true;
     var box = clear($('results'));
     box.hidden = false;
-    append(box, [verdict(r), notices(r), cards(r), findings(r)]);
+    append(box, [verdict(r), notices(r), h('section', { class: 'card fixcard', id: 'fixcard', 'aria-label': 'Auto-fix' }), cards(r), findings(r)]);
+    renderFix();
     var tab = $('tab-results');
     clear(tab);
     append(tab, ['Results', r.totals.error ? h('span', { class: 'count', text: num(r.totals.error) }) : null]);
@@ -2309,28 +2933,33 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     return rows;
   }
 
-  function downloadIssues() {
-    var csv = exportRows().map(function (row) {
-      return row.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
-    }).join('\r\n');
-    var blob = new Blob(['﻿' + csv + '\r\n'], { type: 'text/csv;charset=utf-8' });
-    var a = h('a', { href: URL.createObjectURL(blob), download: (state.result.fileName || 'file').replace(/\.[^.]+$/, '') + '_findings.csv' });
+  function saveBlob(blob, name) {
+    var a = h('a', { href: URL.createObjectURL(blob), download: name });
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
+  function downloadCsv(rows, name) {
+    var csv = rows.map(function (row) {
+      return row.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    // The byte-order mark makes Excel read the CSV as UTF-8.
+    saveBlob(new Blob([String.fromCharCode(0xfeff) + csv + '\r\n'], { type: 'text/csv;charset=utf-8' }), name);
+  }
+
   // Tab-separated text pastes into Excel correctly whatever the Windows list
   // separator is (CIC's guide has users change it to "|", which breaks CSVs).
-  function copyIssues() {
-    var text = exportRows().map(function (row) {
+  function copyRows(rows, btn) {
+    var text = rows.map(function (row) {
       return row.map(function (c) { return String(c).replace(/[\t\r\n]+/g, ' '); }).join('\t');
     }).join('\r\n');
-    var btn = $('copy-btn');
+    var label = btn.getAttribute('data-label') || btn.textContent;
+    btn.setAttribute('data-label', label);
     function done(ok) {
       btn.textContent = ok ? 'Copied' : 'Copy failed';
-      setTimeout(function () { btn.textContent = 'Copy for Excel'; }, 1600);
+      setTimeout(function () { btn.textContent = label; }, 1600);
     }
     function fallback() {
       var ta = h('textarea', { style: 'position:fixed;left:-9999px;top:0' });
@@ -2347,6 +2976,168 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .9rem; }
     } else {
       fallback();
     }
+  }
+
+  function baseName() { return (state.result.fileName || 'file').replace(/\.[^.]+$/, ''); }
+  function downloadIssues() { downloadCsv(exportRows(), baseName() + '_findings.csv'); }
+  function copyIssues() { copyRows(exportRows(), $('copy-btn')); }
+
+  // ---- auto-fix ----------------------------------------------------------
+
+  var FIX_KEY = 'cic-checker-fix-options';
+  var FIX_PAGE = 50;
+  var fixOptions = (function () {
+    var o = FIXER.defaultOptions();
+    try {
+      var saved = JSON.parse(localStorage.getItem(FIX_KEY) || '{}');
+      for (var k in o) if (typeof saved[k] === 'boolean') o[k] = saved[k];
+    } catch (e) { /* storage unavailable: defaults apply */ }
+    o.encoding = true;
+    return o;
+  })();
+
+  function runFix() {
+    var file = state.file, id = state.runId;
+    if (!file) return;
+    state.fix = { running: true, progress: 0 };
+    renderFix();
+    READERS.fixFile(file, {
+      fixes: fixOptions, mfi: $('mfi').checked,
+      onProgress: function (f) {
+        var el = $('fix-progress');
+        if (el && id === state.runId) el.textContent = 'Working… ' + Math.round(f * 100) + '%';
+      }
+    }).then(function (res) {
+      if (id !== state.runId || state.file !== file) return;
+      state.fix = { out: res.fix, after: res.after, parts: res.parts, name: res.fileName, kind: '', page: 0 };
+      renderFix();
+    }).catch(function (err) {
+      if (id !== state.runId || state.file !== file) return;
+      state.fix = { error: err && err.message ? err.message : String(err) };
+      renderFix();
+    });
+  }
+
+  // Loads the corrected text into the page as if it had been dropped in.
+  function useFixed() {
+    var f = state.fix;
+    state.file = new File(f.parts, f.name, { type: 'text/plain' });
+    state.runId++;
+    setResult(f.after);
+    window.scrollTo(0, 0);
+  }
+
+  function changeRows() {
+    var r = state.result, f = state.fix;
+    var rows = [[r.where, 'Record', 'Field No', 'Excel Column', 'Field', 'Before', 'After', 'Fix']];
+    f.out.changes.forEach(function (c) {
+      rows.push([c.line || '', c.rec, c.pos || '', c.pos ? CHECKER.colLetter(c.pos) : '', c.field, c.before, c.after, c.note]);
+    });
+    return rows;
+  }
+
+  function fixOption(kind, f) {
+    var count = f && f.out ? f.out.counts[kind.id] : 0;
+    return h('label', { class: 'check fix-opt' },
+      h('input', {
+        type: 'checkbox', checked: fixOptions[kind.id], disabled: !!kind.always || !!(f && f.running),
+        onchange: function () {
+          fixOptions[kind.id] = this.checked;
+          try { localStorage.setItem(FIX_KEY, JSON.stringify(fixOptions)); } catch (e) { /* not remembered */ }
+          if (state.fix && state.fix.out) runFix();
+        }
+      }),
+      h('span', null, kind.label, count ? h('span', { class: 'count', text: num(count) }) : null,
+        kind.detail ? h('small', { text: kind.detail }) : null));
+  }
+
+  function renderFix() {
+    var card = $('fixcard');
+    if (!card) return;
+    clear(card);
+    var r = state.result, f = state.fix;
+    var excel = r.mode === 'excel';
+    var summary, actions = [];
+    var runLabel = excel ? 'Build fixed .txt' : 'Auto-fix this file';
+
+    if (!f) {
+      summary = excel
+        ? 'Builds the submission .txt from the sheet and corrects what can be corrected without guessing. You get the file and a list of every change.'
+        : 'Corrects what can be corrected without guessing: spacing, dates, numbers, codes, encoding and structure. You get a new file and a list of every change.';
+      actions.push(h('button', { class: 'btn primary', type: 'button', onclick: runFix }, runLabel));
+    } else if (f.running) {
+      summary = h('span', { id: 'fix-progress', text: 'Working…' });
+    } else if (f.error) {
+      summary = 'Auto-fix could not run. ' + f.error;
+      actions.push(h('button', { class: 'btn', type: 'button', onclick: runFix }, 'Try again'));
+    } else {
+      var o = f.out, a = f.after.totals, b = r.totals;
+      var delta = 'Errors ' + num(b.error) + ' → ' + num(a.error) + ', warnings ' + num(b.warning) + ' → ' + num(a.warning) + '.';
+      summary = o.total
+        ? num(o.total) + (o.total === 1 ? ' fix' : ' fixes') + ' on ' + plural(o.changedLines, r.where.toLowerCase()) + '. ' + delta
+        : excel ? 'Nothing needed correcting. ' + delta
+        : b.error + b.warning ? 'Nothing here can be fixed automatically. What is left needs a person to decide.'
+        : 'Nothing needs fixing.';
+      if (o.total || excel) {
+        actions.push(h('button', { class: 'btn primary', type: 'button', onclick: function () { saveBlob(new Blob(f.parts, { type: 'text/plain;charset=utf-8' }), f.name); } }, 'Download fixed file'));
+        actions.push(h('button', { class: 'btn', type: 'button', onclick: useFixed }, 'Show its findings'));
+      }
+    }
+
+    append(card, h('div', { class: 'fix-head' },
+      h('div', null, h('h3', { text: 'Auto-fix' }), h('p', { class: 'fix-summary' + (f && f.error ? ' bad' : '') }, summary)),
+      h('div', { class: 'chips' }, actions)));
+
+    if (f && f.out && (f.out.total || excel)) {
+      var notes = [f.name + ' is a new file with a new timestamp.'];
+      if (f.after.totals.error) notes.push(plural(f.after.totals.error, 'error') + ' still need fixing by hand.');
+      notes.push('Correct the same values in your master file too, or they come back next month.');
+      if (f.out.truncated) notes.push('Only the first ' + num(f.out.changes.length) + ' changes are listed; all were applied.');
+      card.appendChild(h('p', { class: 'fix-note', text: notes.join(' ') }));
+    }
+
+    var kinds = FIXER.KINDS;
+    card.appendChild(h('div', { class: 'fix-options' },
+      h('div', null, kinds.filter(function (k) { return !k.optional; }).map(function (k) { return fixOption(k, f); })),
+      h('div', null,
+        h('p', { class: 'fix-group', text: 'Your call: these change the data itself' }),
+        kinds.filter(function (k) { return k.optional; }).map(function (k) { return fixOption(k, f); }))));
+
+    if (!f || !f.out || !f.out.changes.length) return;
+
+    var changes = f.out.changes.filter(function (c) { return !f.kind || c.kind === f.kind; });
+    var pages = Math.ceil(changes.length / FIX_PAGE);
+    if (f.page >= pages) f.page = Math.max(0, pages - 1);
+    var tbody = h('tbody');
+    changes.slice(f.page * FIX_PAGE, (f.page + 1) * FIX_PAGE).forEach(function (c) {
+      tbody.appendChild(h('tr', null,
+        h('td', { class: 'line', text: c.line ? num(c.line) : '–' }),
+        h('td', { class: 'fld' }, c.pos ? [h('span', { class: 'tag pos', text: c.rec + c.pos }), ' ', h('span', { class: 'name', text: c.field })] : h('span', { class: 'name', text: c.rec ? c.rec + ' record' : 'Whole line' })),
+        h('td', { class: 'value' }, h('span', { class: 'lit old', text: c.before })),
+        h('td', { class: 'value' }, h('span', { class: 'lit new', text: c.after })),
+        h('td', { text: c.note })));
+    });
+    var filter = h('select', { 'aria-label': 'Kind of fix', onchange: function () { f.kind = this.value; f.page = 0; renderFix(); } },
+      h('option', { value: '', text: 'All fixes (' + num(f.out.changes.length) + ')' }),
+      kinds.filter(function (k) { return f.out.counts[k.id]; }).map(function (k) {
+        return h('option', { value: k.id, selected: f.kind === k.id, text: k.label + ' (' + num(f.out.counts[k.id]) + ')' });
+      }));
+    append(card, [
+      h('div', { class: 'toolbar fix-tools' },
+        h('label', { class: 'field grow' }, 'Changes made', filter),
+        h('button', { class: 'btn', type: 'button', onclick: function () { copyRows(changeRows(), this); } }, 'Copy for Excel'),
+        h('button', { class: 'btn', type: 'button', onclick: function () { downloadCsv(changeRows(), f.name.replace(/\.txt$/, '') + '_changes.csv'); } }, 'Download CSV')),
+      h('div', { class: 'table-scroll' },
+        h('table', { class: 'grid' },
+          h('thead', null, h('tr', null,
+            h('th', { style: 'width:5rem', text: r.where }), h('th', { style: 'width:22%', text: 'Field' }),
+            h('th', { style: 'width:22%', text: 'Before' }), h('th', { style: 'width:22%', text: 'After' }), h('th', { text: 'Fix' }))),
+          tbody)),
+      pages > 1 ? h('div', { class: 'pager' },
+        h('span', { text: num(f.page * FIX_PAGE + 1) + '–' + num(Math.min(changes.length, (f.page + 1) * FIX_PAGE)) + ' of ' + num(changes.length) }),
+        h('button', { class: 'btn small', type: 'button', disabled: f.page === 0, onclick: function () { f.page--; renderFix(); } }, 'Previous'),
+        h('button', { class: 'btn small', type: 'button', disabled: f.page >= pages - 1, onclick: function () { f.page++; renderFix(); } }, 'Next')) : null
+    ]);
   }
 
   // ---- code tables -------------------------------------------------------

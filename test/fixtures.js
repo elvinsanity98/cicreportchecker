@@ -101,6 +101,12 @@ function brokenLines() {
     individual('IND-0001', 'JUAN', 'DELA CRUZ', { 'Date of Birth': '1211989', 'Gender': 'm' }),
     individual('IND-0001', 'MARIA', '', { 'Nationality': 'PHL', 'Subject Reference Date': '31072026' }),
     individual('IND-0003', ' PEDRO', 'GARCIA', { 'Date of Birth': '1975-02-21', 'Identification 1: Number': '', 'Contact 1: Type': '7' }),
+    // Everything wrong on this record can be corrected by the auto-fixer
+    // (the comma in the last name only with symbol removal switched on).
+    individual('IND-0004', 'ANA  MARIE', 'DELOS SANTOS, JR.', {
+      'Gender': 'Female', 'Date of Birth': '25/03/1990', 'Civil Status': 'Married', 'Nationality': 'PHILIPPINES',
+      'Identification 1: Number': '123-456-789-000', 'Address 1: FullAddress': '#12 RIZAL ST.,  BRGY. STO. NIÑO, LILOY'
+    }),
     business('COM-0001', 'SAMPLE TRADING CORP', { 'Provider Code': 'BANK9999', 'Legal Form': '99', 'Gross Income / Annual Turnover': '1,250,000.00' }),
     installment('IND-0001', 'LN-2024-000101', { 'Contract Phase': 'CL', 'Overdue Payments Number': '2' }),
     installment('IND-0001', 'LN-2024-000101'),

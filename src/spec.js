@@ -14,6 +14,8 @@
 //   max    maximum length (only where the manuals state one)
 //   dom    code table in domains.js (array = any of several tables)
 //   soft   format problems are warnings instead of errors
+//   text   'name' = a person's name, 'free' = other free text (addresses,
+//          trade names). Used for symbol checks and the optional auto-fixes.
 (function (root) {
   function f(name, type, opts) {
     var d = { name: name, type: type || 'X' };
@@ -24,13 +26,13 @@
   function address(prefix, typeDom) {
     return [
       f(prefix + ': Address Type', 'X', { dom: typeDom }),
-      f(prefix + ': FullAddress'),
-      f(prefix + ': StreetNo'),
+      f(prefix + ': FullAddress', 'X', { text: 'free' }),
+      f(prefix + ': StreetNo', 'X', { text: 'free' }),
       f(prefix + ': PostalCode'),
-      f(prefix + ': Subdivision'),
-      f(prefix + ': Barangay'),
-      f(prefix + ': City'),
-      f(prefix + ': Province'),
+      f(prefix + ': Subdivision', 'X', { text: 'free' }),
+      f(prefix + ': Barangay', 'X', { text: 'free' }),
+      f(prefix + ': City', 'X', { text: 'free' }),
+      f(prefix + ': Province', 'X', { text: 'free' }),
       f(prefix + ': Country', 'X', { dom: 'Country' }),
       f(prefix + ': House Owner/Lessee', 'X', { dom: 'HouseOwnerLessee' }),
       f(prefix + ': Occupied Since', 'D', { soft: true })
@@ -55,7 +57,7 @@
       out.push(f(p + 'IssueDate', 'D'));
       out.push(f(p + 'IssueCountry', 'X', { dom: 'Country' }));
       out.push(f(p + 'ExpiryDate', 'D'));
-      out.push(f(p + 'Issued By'));
+      out.push(f(p + 'Issued By', 'X', { text: 'free' }));
     }
     return out;
   }
@@ -66,15 +68,15 @@
       var p = 'Guarantee ' + i + ': ';
       out.push(f(p + 'Provider Guarantee No'));
       out.push(f(p + 'Provider Subject No (Guarantor)', 'X', { max: 38 }));
-      out.push(f(p + 'Guarantor Name'));
+      out.push(f(p + 'Guarantor Name', 'X', { text: 'free' }));
       out.push(f(p + 'Guaranteed Amount', 'N'));
       out.push(f(p + 'Currency', 'X', { dom: 'Currency' }));
       out.push(f(p + 'Validity Start Date', 'D'));
       out.push(f(p + 'Validity End Date', 'D'));
       out.push(f(p + 'Guarantee Type', 'X', { dom: 'Guarantees' }));
       out.push(f(p + 'Asset Code'));
-      out.push(f(p + 'Asset Description'));
-      out.push(f(p + 'Asset Location'));
+      out.push(f(p + 'Asset Description', 'X', { text: 'free' }));
+      out.push(f(p + 'Asset Location', 'X', { text: 'free' }));
       out.push(f(p + 'Asset Appraised Value', 'N'));
       out.push(f(p + 'Asset Registry External Link'));
       out.push(f(p + 'Customer Type', 'X', { dom: 'GuaranteeCustomerType' }));
@@ -88,7 +90,7 @@
       var p = 'Linked Subject ' + i + ': ';
       out.push(f(p + 'Provider Subject No', 'X', { max: 38 }));
       out.push(f(p + 'Role', 'X', { dom: 'Role' }));
-      out.push(f(p + 'Name of the Linked Subject'));
+      out.push(f(p + 'Name of the Linked Subject', 'X', { text: 'free' }));
     }
     return out;
   }
@@ -132,31 +134,31 @@
 
   var ID = common('Subject Reference Date').concat([
     f('Title', 'X', { dom: 'Title' }),
-    f('First Name', 'X', { req: 'M' }),
-    f('Last Name', 'X', { req: 'M' }),
-    f('Middle Name'),
-    f('Suffix'),
-    f('Nickname'),
-    f('Previous Last Name'),
+    f('First Name', 'X', { req: 'M', text: 'name' }),
+    f('Last Name', 'X', { req: 'M', text: 'name' }),
+    f('Middle Name', 'X', { text: 'name' }),
+    f('Suffix', 'X', { text: 'name' }),
+    f('Nickname', 'X', { text: 'name' }),
+    f('Previous Last Name', 'X', { text: 'name' }),
     f('Gender', 'X', { req: 'E', dom: 'Gender' }),
     f('Date of Birth', 'D', { req: 'M' }),
-    f('Place of Birth', 'X', { max: 100 }),
+    f('Place of Birth', 'X', { max: 100, text: 'free' }),
     f('Country of Birth (Code)', 'X', { dom: 'Country' }),
     f('Nationality', 'X', { dom: 'Country' }),
     f('Resident', 'X', { dom: 'YesNo' }),
     f('Civil Status', 'X', { dom: 'CivilStatus' }),
     f('Number of Dependents', 'N'),
     f('Car/s Owned', 'N'),
-    f('Spouse First Name'),
-    f('Spouse Last Name'),
-    f('Spouse Middle Name'),
-    f("Mother's Maiden First Name"),
-    f("Mother's Maiden Full Name"),
-    f("Mother's Maiden Middle Name"),
-    f('Father First Name'),
-    f('Father Last Name'),
-    f('Father Middle Name'),
-    f('Father Suffix')
+    f('Spouse First Name', 'X', { text: 'name' }),
+    f('Spouse Last Name', 'X', { text: 'name' }),
+    f('Spouse Middle Name', 'X', { text: 'name' }),
+    f("Mother's Maiden First Name", 'X', { text: 'name' }),
+    f("Mother's Maiden Full Name", 'X', { text: 'name' }),
+    f("Mother's Maiden Middle Name", 'X', { text: 'name' }),
+    f('Father First Name', 'X', { text: 'name' }),
+    f('Father Last Name', 'X', { text: 'name' }),
+    f('Father Middle Name', 'X', { text: 'name' }),
+    f('Father Suffix', 'X', { text: 'name' })
   ])
     .concat(address('Address 1', 'AddressTypeIndividual'))
     .concat(address('Address 2', 'AddressTypeIndividual'))
@@ -164,7 +166,7 @@
     .concat(idDocs())
     .concat(pairs('Contact', 2, 'Type', 'Value', 'ContactType'))
     .concat([
-      f('Employment: Trade Name'),
+      f('Employment: Trade Name', 'X', { text: 'free' }),
       f('Employment: TIN'),
       f('Employment: Phone Number'),
       f('Employment: PSIC', 'X', { dom: 'PSIC' }),
@@ -175,7 +177,7 @@
       f('Employment: DateHiredFrom', 'D'),
       f('Employment: DateHiredTo', 'D'),
       f('Employment: Occupation', 'X', { dom: 'PSOC' }),
-      f('Sole Trader: TradeName')
+      f('Sole Trader: TradeName', 'X', { text: 'free' })
     ])
     // The workbook lists MI/AI for individuals and MT/AT for companies and does
     // not say which a sole trader's business address takes, so accept both.
@@ -185,8 +187,8 @@
     .concat(pairs('Sole Trader Contact', 2, 'Type', 'Value', 'ContactType'));
 
   var BD = common('Subject Reference Date').concat([
-    f('Trade Name', 'X', { req: 'M' }),
-    f('Official registered Trade Name'),
+    f('Trade Name', 'X', { req: 'M', text: 'free' }),
+    f('Official registered Trade Name', 'X', { text: 'free' }),
     f('Nationality', 'X', { dom: 'Country' }),
     f('Resident', 'X', { dom: 'YesNo' }),
     f('Legal Form', 'X', { dom: 'LegalForm' }),
@@ -227,7 +229,7 @@
     f('Good Type', 'X', { dom: 'GoodType' }),
     f('Good Value', 'N'),
     f('New/Used Code', 'X', { dom: 'NewUsed' }),
-    f('Good Brand'),
+    f('Good Brand', 'X', { text: 'free' }),
     f('Manufacturing Date', 'D', { soft: true }),
     f('Registration number')
   ]).concat(guarantees()).concat(linkedSubjects());
@@ -287,7 +289,7 @@
 
   var NE = common('Negative Event Reference Date').concat([
     f('Event Code', 'X', { req: 'M', dom: 'SubjectInfoType' }),
-    f('Event Detail'),
+    f('Event Detail', 'X', { text: 'free' }),
     f('Event Date', 'D', { req: 'E' }),
     f('Event Status', 'X', { dom: 'EventStatus' }),
     f('Event Status Date', 'D')

@@ -76,8 +76,8 @@ test('file name rules', () => {
 
 test('BOM, encoding and delimiter', () => {
   const lines = fx.cleanLines();
-  assert.ok(has(check(['﻿' + lines[0]].concat(lines.slice(1))), 'F-BOM'));
-  assert.ok(has(withLine(1, fx.individual('IND-0001', 'JUAN', 'PE�A')), 'F-UTF8'));
+  assert.ok(has(check(['\ufeff' + lines[0]].concat(lines.slice(1))), 'F-BOM'));
+  assert.ok(has(withLine(1, fx.individual('IND-0001', 'JUAN', 'PE\ufffdA')), 'F-UTF8'));
   assert.ok(has(withLine(1, 'ID,BANK1234,B0001,30062026,IND-0001'), 'S-DELIM'));
 });
 
@@ -186,6 +186,196 @@ test('broken sample trips the expected rules', () => {
     'V-REQ:ID8', 'X-DUPSUBJ:ID5', 'X-REFDATE:ID4', 'V-CODE:ID17', 'C-PAIR:ID55', 'X-PROV:BD2', 'V-NUM:BD16',
     'X-DUPCON:CI7', 'V-CODE:CI11', 'S-BLANK', 'T-COUNT:FT4', 'X-NOSUBJ:CI5']) {
     assert.ok(has(r, code), code);
+  }
+});
+
+// ---- detections added with the auto-fixer -------------------------------
+
+const FIXER = require('../src/fixer.js');
+const fs = require('fs');
+const path = require('path');
+const ch = (...codes) => String.fromCharCode(...codes);
+const ENYE = ch(0xd1);
+
+test('double spaces, odd characters, name symbols and TIN format are reported', () => {
+  const id = (extra) => withLine(1, fx.individual('IND-0001', 'JUAN', 'DELA CRUZ', extra));
+  assert.ok(has(id({ 'First Name': 'JUAN  CARLOS' }), 'V-DSPACE:ID7'));
+  assert.ok(has(id({ 'Address 1: FullAddress': '23' + ch(0xa0) + 'MABINI ST' }), 'V-ODD:ID33'));
+  assert.ok(has(id({ 'Last Name': 'PE' + ch(0xc3, 0x2018) + 'A' }), 'V-ODD:ID8'));
+  assert.ok(has(id({ 'Last Name': 'DELA CRUZ, JR' }), 'V-NAME:ID8'));
+  assert.ok(has(id({ 'Nickname': 'JUN2' }), 'V-NAME:ID11'));
+  assert.deepStrictEqual(codes(id({ 'Last Name': "O'BRIEN-PE" + ENYE + 'A JR.' })), []);
+  assert.ok(has(id({ 'Identification 1: Number': '123-456-789' }), 'C-TIN:ID55'));
+  assert.ok(has(id({ 'Identification 1: Number': '12345678' }), 'C-TIN:ID55'));
+  assert.ok(has(id({ 'Employment: TIN': '123-456-789' }), 'C-TIN:ID83'));
+  // Only TIN (type 10) has the digits rule.
+  assert.deepStrictEqual(codes(id({ 'Identification 1: Type': '11', 'Identification 1: Number': '34-1234567-8' })), []);
+  assert.ok(has(withLine(4, fx.business('COM-0001', 'ACME', { 'Identification 1: Number': '987 654 321' })), 'C-TIN:BD43'));
+});
+
+// ---- auto-fixer --------------------------------------------------------
+
+function fix(lines, options) {
+  const f = FIXER.createFixer({ options });
+  lines.forEach((l) => f.line(l));
+  return f.finish();
+}
+// Field value of one record after fixing, by field name.
+function fixedValue(type, lineText, fieldName, options) {
+  const out = fix([lineText], options);
+  const idx = SPEC.RECORDS[type].fields.findIndex((d) => d.name === fieldName);
+  return out.lines[0].split('|')[idx];
+}
+
+test('fixer: a clean file comes back unchanged', () => {
+  const out = fix(fx.cleanLines());
+  assert.strictEqual(out.total, 0);
+  assert.deepStrictEqual(out.lines, fx.cleanLines());
+});
+
+test('fixer: dates are rewritten only when there is one reading', () => {
+  const same = { '1052014': '01052014', '2026-06-30': '30062026', '30/06/2026': '30062026', '06/30/2026': '30062026',
+    '06302026': '30062026', '20260630': '30062026', '46203': '30062026', '30-Jun-2026': '30062026',
+    'June 30, 2026': '30062026', '2026-06-30 00:00:00': '30062026', '30.06.2026': '30062026', '5/5/2026': '05052026' };
+  for (const [from, to] of Object.entries(same)) assert.strictEqual(FIXER.fixDate(from), to, from);
+  // Valid already, impossible, or readable two ways: left alone.
+  for (const v of ['30062026', '05/06/2026', '31/02/2026', '1211989', '30/06/26', 'N/A', '99999999']) assert.strictEqual(FIXER.fixDate(v), null, v);
+});
+
+test('fixer: numbers, TINs and garbled text', () => {
+  const nums = { '1,250,000.00': '1250000', '100,000': '100000', '1 000': '1000', 'PHP 1,000': '1000', '1,234.50': '1234.50' };
+  for (const [from, to] of Object.entries(nums)) assert.strictEqual(FIXER.fixNumber(from), to, from);
+  for (const v of ['100', '100000.50', '12,5', '1,00,000', '1E+05', 'abc', '-500']) assert.strictEqual(FIXER.fixNumber(v), null, v);
+  assert.strictEqual(FIXER.fixTin('123-456-789-000'), '123456789000');
+  assert.strictEqual(FIXER.fixTin('123 456 789'), '123456789');
+  for (const v of ['123456789', '12345', 'A23456789', '123-456']) assert.strictEqual(FIXER.fixTin(v), null, v);
+  assert.strictEqual(FIXER.repairGarbled('PE' + ch(0xc3, 0x2018) + 'A'), 'PE' + ENYE + 'A');
+  assert.strictEqual(FIXER.repairGarbled('pe' + ch(0xc3, 0xb1) + 'a'), 'pe' + ch(0xf1) + 'a');
+  assert.strictEqual(FIXER.repairGarbled('PE' + ENYE + 'A'), 'PE' + ENYE + 'A');
+});
+
+test('fixer: field fixes inside a record', () => {
+  const line = fx.individual('IND-0001', '  JUAN   CARLOS ', 'DELA' + ch(0xa0) + 'CRUZ', {
+    'Gender': 'male', 'Civil Status': 'Married', 'Nationality': 'Philippines', 'Date of Birth': '1989-11-12',
+    'Number of Dependents': '2.0', 'Identification 1: Number': '123-456-789-000', 'Employment: GrossIncome': '25,000.00',
+    'Middle Name': '"REYES"', 'Nickname': 'JUN' + ch(0x2019) + 'S', 'Address 1: Address Type': 'mi', 'Title': '10.0'
+  });
+  const out = fix([line]);
+  const get = (name) => out.lines[0].split('|')[SPEC.RECORDS.ID.fields.findIndex((d) => d.name === name)];
+  assert.strictEqual(get('First Name'), 'JUAN CARLOS');
+  assert.strictEqual(get('Last Name'), 'DELA CRUZ');
+  assert.strictEqual(get('Gender'), 'M');
+  assert.strictEqual(get('Civil Status'), '2');
+  assert.strictEqual(get('Nationality'), 'PH');
+  assert.strictEqual(get('Date of Birth'), '12111989');
+  assert.strictEqual(get('Number of Dependents'), '2');
+  assert.strictEqual(get('Identification 1: Number'), '123456789000');
+  assert.strictEqual(get('Employment: GrossIncome'), '25000');
+  assert.strictEqual(get('Middle Name'), 'REYES');
+  assert.strictEqual(get('Nickname'), "JUN'S");
+  assert.strictEqual(get('Address 1: Address Type'), 'MI');
+  assert.strictEqual(get('Title'), '10');
+  // Every change is logged with the field it touched.
+  assert.ok(out.changes.every((c) => c.line === 1 && c.rec === 'ID' && c.pos > 0 && c.before !== c.after));
+  assert.strictEqual(out.changedLines, 1);
+  // The fixed record passes the checker.
+  const lines = fx.cleanLines();
+  lines[1] = out.lines[0];
+  assert.deepStrictEqual(codes(check(lines)), []);
+});
+
+test('fixer: structure, header and footer', () => {
+  const src = fx.cleanLines();
+  const messy = ['Record Type|Provider Code|File Reference Date', src[0].replace('|1.0|', '|1|'), '', 'id' + src[1].slice(2)]
+    .concat(src.slice(2, 12), ['', src[12].replace(/\|13$/, '|99') + '|||', '']);
+  messy[5] = messy[5].replace(/\|+$/, '');
+  const out = fix(messy);
+  assert.deepStrictEqual(out.lines, src);
+  assert.strictEqual(out.records, 13);
+  assert.deepStrictEqual(codes(check(out.lines)), []);
+  for (const kind of ['structure', 'header', 'codes']) assert.ok(out.counts[kind] > 0, kind);
+});
+
+test('fixer: comma-delimited lines become pipe-delimited', () => {
+  const out = fix(['HD,BANK1234,30062026,1.0,0,"JUNE, REGULAR"', 'FT,BANK1234,30062026,2']);
+  assert.deepStrictEqual(out.lines, ['HD|BANK1234|30062026|1.0|0|JUNE, REGULAR', 'FT|BANK1234|30062026|2']);
+  assert.strictEqual(out.counts.delimiter, 2);
+});
+
+test('fixer: accents and symbols are only touched when asked', () => {
+  const line = fx.individual('IND-0001', 'MA. TERESA', "DELA PE" + ENYE + 'A-CRUZ, JR.', {
+    'Address 1: FullAddress': '#12 RIZAL ST., BRGY. STO. NI' + ENYE + 'O', 'Provider Subject No': 'IND-0001/A',
+    'Contact 1: Type': '7', 'Contact 1: Value': 'ma.teresa@example.com'
+  });
+  assert.strictEqual(fix([line]).total, 0);
+  const plain = (name, options) => fixedValue('ID', line, name, options);
+  assert.strictEqual(plain('Last Name', { enye: true }), 'DELA PENA-CRUZ, JR.');
+  assert.strictEqual(plain('Last Name', { symbols: true }), 'DELA PE' + ENYE + 'A CRUZ JR');
+  assert.strictEqual(plain('First Name', { symbols: true }), 'MA TERESA');
+  assert.strictEqual(plain('Address 1: FullAddress', { symbols: true, enye: true }), '12 RIZAL ST BRGY STO NINO');
+  // Keys, e-mail addresses and codes are never stripped.
+  assert.strictEqual(plain('Provider Subject No', { symbols: true, enye: true }), 'IND-0001/A');
+  assert.strictEqual(plain('Contact 1: Value', { symbols: true, enye: true }), 'ma.teresa@example.com');
+  assert.strictEqual(FIXER.stripSymbols("O'BRIEN & SONS"), 'OBRIEN AND SONS');
+});
+
+test('fixer: each kind can be switched off', () => {
+  const line = fx.individual('IND-0001', ' JUAN', 'DELA CRUZ', { 'Gender': 'm', 'Date of Birth': '1989-11-12' });
+  const all = fix([line]);
+  assert.deepStrictEqual([all.counts.spaces, all.counts.codes, all.counts.dates], [1, 1, 1]);
+  const some = fix([line], { dates: false, codes: false });
+  assert.deepStrictEqual([some.counts.spaces, some.counts.codes, some.counts.dates], [1, 0, 0]);
+  assert.strictEqual(fixedValue('ID', line, 'Date of Birth', { dates: false }), '1989-11-12');
+});
+
+test('fixer: ANSI bytes and BOM become plain UTF-8', () => {
+  const text = fx.cleanLines().join('\r\n').replace('DELA CRUZ', 'PE' + ENYE + 'A') + '\r\n';
+  const expected = text.trimEnd().split('\r\n');
+  for (const bytes of [Buffer.from(text, 'latin1'), Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(text, 'utf8')])]) {
+    const f = FIXER.createFixer({});
+    FIXER.feedBytes(f, new Uint8Array(bytes));
+    const out = f.finish();
+    assert.deepStrictEqual(out.lines, expected);
+    assert.strictEqual(out.counts.encoding, 1);
+    assert.deepStrictEqual(codes(check(out.lines)), []);
+  }
+});
+
+test('fixer: fixing twice changes nothing more, and the broken sample improves', () => {
+  const before = check(fx.brokenLines());
+  const out = fix(fx.brokenLines());
+  const after = check(out.lines);
+  assert.ok(after.totals.error < before.totals.error && after.totals.warning < before.totals.warning);
+  assert.strictEqual(fix(out.lines).total, 0);
+  // What needs a decision is still reported.
+  for (const code of ['V-REQ:ID8', 'X-DUPSUBJ:ID5', 'V-CODE:BD10', 'X-DUPCON:CI7', 'H-SUBTYPE:HD5']) assert.ok(has(after, code), code);
+  // The fully fixable record keeps only its name-symbol warning, and loses
+  // that too once symbol removal is switched on.
+  const left = (result) => result.issues.filter((i) => (result.detail.get(i.line) || [])[4] === 'IND-0004').map((i) => i.code);
+  assert.deepStrictEqual(left(after), ['V-NAME']);
+  assert.deepStrictEqual(left(check(fix(fx.brokenLines(), { symbols: true }).lines)), []);
+});
+
+test('fixer: suggested file name', () => {
+  const now = new Date(2026, 6, 5, 9, 3, 7);
+  assert.strictEqual(FIXER.suggestName('BANK1234', 'whatever.txt', now), 'BANK1234_CSDF_20260705090307.txt');
+  assert.strictEqual(FIXER.suggestName('', 'PRVD9999_CSDF_20141229030101.txt', now), 'PRVD9999_CSDF_20260705090307.txt');
+  assert.strictEqual(FIXER.suggestName('TOO-LONG-CODE', 'june.txt', now), 'june_fixed.txt');
+});
+
+test('source files hold no invisible characters', () => {
+  // Such characters must be written as escapes: they are easy to lose in an
+  // editor, and a line separator inside a regex literal breaks the script.
+  const hidden = (o) => (o < 32 && o !== 9 && o !== 10 && o !== 13) || (o >= 0x7f && o <= 0xa0) || o === 0xad ||
+    (o >= 0x300 && o <= 0x36f) || (o >= 0x2000 && o <= 0x200f) || [0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x2060, 0x3000, 0xfeff, 0xfffd].includes(o);
+  const root = path.join(__dirname, '..');
+  const files = ['cli.js', 'index.html'].concat(
+    ['src', 'test', 'tools'].flatMap((dir) => fs.readdirSync(path.join(root, dir)).filter((f) => /\.(js|html|css)$/.test(f)).map((f) => dir + '/' + f)));
+  for (const file of files) {
+    const text = fs.readFileSync(path.join(root, file), 'utf8');
+    for (let i = 0; i < text.length; i++) {
+      if (hidden(text.charCodeAt(i))) assert.fail(`${file}: U+${text.charCodeAt(i).toString(16)} at offset ${i}`);
+    }
   }
 });
 
@@ -321,6 +511,36 @@ test('reader: refuses encrypted and legacy files', async () => {
   await assert.rejects(checkFile(new File(['x'], 'BANK1234_CSDF_20260705093000.zip.gpg'), {}), /encrypted/);
   await assert.rejects(checkFile(new File(['x'], 'master.xls'), {}), /\.xlsx/);
   await assert.rejects(checkFile(new File(['not a zip'], 'file.zip'), {}), /ZIP/);
+});
+
+test('reader: fixFile corrects text, zip and excel input', async () => {
+  globalThis.CIC_FIXER = FIXER;
+  const { fixFile } = globalThis.CIC_READERS;
+  const broken = Buffer.from(fx.brokenLines().join('\r\n') + '\r\n', 'latin1');
+  const res = await fixFile(new File([broken], 'BANK1234_CSDF_20260705101500.txt'), {});
+  assert.match(res.fileName, /^BANK1234_CSDF_\d{14}\.txt$/);
+  assert.ok(res.fix.total > 0 && res.fix.counts.encoding > 0);
+  for (const code of ['F-UTF8', 'F-NAME', 'S-LABEL', 'S-BLANK', 'T-COUNT:FT4']) assert.ok(!has(res.after, code), code);
+  // The corrected file is UTF-8 without BOM, CRLF line ends, with its Ñ intact.
+  const bytes = Buffer.from(await new Blob(res.parts).arrayBuffer());
+  const text = bytes.toString('utf8');
+  assert.ok(bytes[0] !== 0xef && text.endsWith('\r\n') && !text.includes('\r\n\r\n'));
+  assert.ok(text.includes('STO. NI' + ENYE + 'O') && !text.includes(ch(0xfffd)));
+  assert.strictEqual(res.size, bytes.length);
+  assert.strictEqual(res.after.records, text.trimEnd().split('\r\n').length);
+
+  const zip = makeZip([{ name: 'BANK1234_CSDF_20260705101500.txt', data: broken }]);
+  const zipped = await fixFile(new File([zip], 'upload.zip'), {});
+  assert.deepStrictEqual(zipped.fix.lines, res.fix.lines);
+
+  // Excel master file in, finished text file out.
+  const rows = [['Record Type', 'Provider Code'], []].concat(fx.cleanLines().map((l) => l.split('|')));
+  rows[3][13] = '1989-11-12';
+  const sheet = await fixFile(new File([makeXlsx(rows)], 'master.xlsx'), {});
+  assert.deepStrictEqual(sheet.fix.lines, fx.cleanLines());
+  assert.strictEqual(sheet.fix.total, 1);
+  assert.deepStrictEqual(codes(sheet.after), []);
+  assert.match(sheet.fileName, /^BANK1234_CSDF_\d{14}\.txt$/);
 });
 
 (async () => {

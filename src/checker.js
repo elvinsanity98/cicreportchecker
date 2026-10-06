@@ -50,6 +50,9 @@
     'V-SPACE':      { sev: 'warning', basis: 'practice', title: 'Value has leading or trailing spaces' },
     'V-CHAR':       { sev: 'error',   basis: 'practice', title: 'Value contains tab or control characters' },
     'V-QUOTE':      { sev: 'warning', basis: 'practice', title: 'Value is wrapped in double quotes' },
+    'V-DSPACE':     { sev: 'warning', basis: 'practice', title: 'Value has double spaces' },
+    'V-ODD':        { sev: 'warning', basis: 'practice', title: 'Value has non-standard or garbled characters' },
+    'V-NAME':       { sev: 'warning', basis: 'practice', title: 'Name contains digits or symbols' },
     'H-VERSION':    { sev: 'error',   basis: 'manual',   title: 'Version must be 1.0' },
     'H-SUBTYPE':    { sev: 'error',   basis: 'manual',   title: 'Submission Type must be 0 or 1' },
     'H-PROV':       { sev: 'warning', basis: 'manual',   title: 'Provider Code is not 8 alphanumeric characters' },
@@ -71,6 +74,7 @@
     'C-IDENT':      { sev: 'warning', basis: 'practice', title: 'No identification number or ID document' },
     'C-CONTACT':    { sev: 'warning', basis: 'practice', title: 'No contact details' },
     'C-EMAIL':      { sev: 'warning', basis: 'practice', title: 'E-mail contact does not look like an e-mail address' },
+    'C-TIN':        { sev: 'error',   basis: 'practice', title: 'TIN must be 9 to 12 digits' },
     'C-PHASE':      { sev: 'warning', basis: 'practice', title: 'Dates do not fit the Contract Phase' },
     'C-DATES':      { sev: 'warning', basis: 'practice', title: 'Dates are out of order' },
     'C-OVERDUE':    { sev: 'warning', basis: 'practice', title: 'Overdue number and overdue amount disagree' }
@@ -81,6 +85,34 @@
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
   var CONTRACT_TYPES = { CI: 1, CN: 1, CC: 1, CS: 1 };
+
+  // Characters that look fine on screen but are not plain text: non-breaking
+  // and other odd spaces, zero-width marks, curly quotes, long dashes.
+  var ODD_CHARS = /[\u007f-\u00a0\u00ad\u1680\u2000-\u200d\u2010-\u2015\u2018-\u201f\u2026\u2028\u2029\u202f\u2032\u2033\u205f\u2060\u3000\ufeff]/g;
+  // UTF-8 text that was opened as ANSI and saved again, e.g. "\u00c3\u2018" for "\u00d1".
+  var GARBLED = /[\u00c2-\u00f4][\u0080-\u00bf\u2018-\u203a\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc\u20ac\u2122]/;
+  // U+FFFD is left out: a line with broken bytes is already reported as F-UTF8.
+  var NAME_SYMBOLS = /[^\p{L}\p{M} .'\-\ufffd]/gu;
+  var ODD_NAMES = {
+    '\u00a0': 'non-breaking space', '\u00ad': 'soft hyphen', '\u200b': 'zero-width space', '\ufeff': 'zero-width mark',
+    '\u2018': 'curly quote', '\u2019': 'curly quote', '\u201c': 'curly double quote', '\u201d': 'curly double quote',
+    '\u2013': 'long dash', '\u2014': 'long dash', '\u2026': 'ellipsis character'
+  };
+  // Identification fields as 0-based [type, number] index pairs, plus plain TIN fields.
+  var TIN_FIELDS = {
+    ID: { pairs: [[53, 54], [55, 56], [57, 58], [115, 116], [117, 118]], plain: [82] },
+    BD: { pairs: [[41, 42], [43, 44]], plain: [] }
+  };
+  var TIN_RE = /^\d{9,12}$/;
+
+  function describeOdd(val) {
+    var seen = {}, out = [];
+    (val.match(ODD_CHARS) || []).forEach(function (ch) {
+      var label = ODD_NAMES[ch] || 'U+' + ('000' + ch.charCodeAt(0).toString(16).toUpperCase()).slice(-4);
+      if (!seen[label]) { seen[label] = true; out.push(label); }
+    });
+    return out.join(', ');
+  }
 
   // ---- helpers ---------------------------------------------------------
 
@@ -157,7 +189,7 @@
         var names = def.dom ? [].concat(def.dom) : def.orDom ? [def.orDom] : [];
         return {
           name: def.name, type: def.type, req: def.req || '', max: def.max || 0,
-          soft: !!def.soft, refDate: !!def.refDate, numeric: def.type === 'N',
+          soft: !!def.soft, refDate: !!def.refDate, numeric: def.type === 'N', text: def.text || '',
           strictDom: !!def.dom, doms: names.map(domainSet)
         };
       });
@@ -295,6 +327,20 @@
         if (val.length > 1 && val.charAt(0) === '"' && val.charAt(val.length - 1) === '"') {
           add('V-QUOTE', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Excel adds quotes when a cell contains a quote or the list separator. Remove them.' });
         }
+        if (val.indexOf('  ') >= 0) {
+          add('V-DSPACE', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Use a single space between words.' });
+        }
+        if (GARBLED.test(val)) {
+          add('V-ODD', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Looks like damaged encoding, such as "\u00c3\u2018" where "\u00d1" was meant. Auto-fix can repair it.' });
+        } else if (val.search(ODD_CHARS) >= 0) {
+          add('V-ODD', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Contains ' + describeOdd(val) + '. Type plain spaces, quotes and hyphens instead.' });
+        }
+        if (def.text === 'name') {
+          var odd = val.match(NAME_SYMBOLS);
+          if (odd) {
+            add('V-NAME', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: 'Found ' + odd.filter(function (c, k) { return odd.indexOf(c) === k; }).join(' ') + '. Names normally hold only letters, spaces, hyphen, apostrophe and period.' });
+          }
+        }
         if (def.max && val.length > def.max) {
           add('V-LEN', { line: line, rec: type, pos: pos, value: val, fields: fields, msg: val.length + ' characters; maximum is ' + def.max + '.' });
         }
@@ -347,6 +393,20 @@
       add('C-PAIR', {
         line: line, rec: type, pos: missing + 1, fields: fields,
         msg: defs[missing].name + ' is empty but ' + defs[v[iType] ? iType : iValue].name + ' is filled.'
+      });
+    }
+
+    function tinCheck(type, line, fields, v, defs) {
+      var spec = TIN_FIELDS[type];
+      var targets = spec.plain.slice();
+      spec.pairs.forEach(function (pair) { if (v[pair[0]] === '10') targets.push(pair[1]); });
+      targets.forEach(function (idx) {
+        if (!v[idx] || TIN_RE.test(v[idx])) return;
+        var digits = v[idx].replace(/\D/g, '').length;
+        add('C-TIN', {
+          line: line, rec: type, pos: idx + 1, value: v[idx], fields: fields,
+          msg: defs[idx].name + ' holds a TIN: digits only, 9 to 12 of them, no dashes or spaces. Found ' + digits + ' digit(s)' + (digits === v[idx].length ? '.' : ' plus other characters.')
+        });
       });
     }
 
@@ -432,6 +492,7 @@
       addressCheck('ID', line, fields, v, 104, false);
       for (k = 0; k < 2; k++) pairCheck('ID', line, fields, v, 115 + k * 2, 116 + k * 2, defs);
       contactCheck('ID', line, fields, v, 119, 2, defs);
+      tinCheck('ID', line, fields, v, defs);
     }
 
     function checkBD(line, fields, r, defs) {
@@ -447,6 +508,7 @@
         add('C-IDENT', { line: line, rec: 'BD', pos: 42, fields: fields, msg: 'Give at least one Identification (TIN, SEC, DTI or CDA registration number).' });
       }
       contactCheck('BD', line, fields, v, 45, 2, defs);
+      tinCheck('BD', line, fields, v, defs);
     }
 
     function checkContract(type, line, fields, r, defs) {
@@ -661,7 +723,7 @@
         }
         if (!text.trim()) { st.blanks.push(n); return; }
         flushBlanks(false);
-        if (text.indexOf('�') >= 0) {
+        if (text.indexOf('\ufffd') >= 0) {
           add('F-UTF8', { line: n, value: text.slice(0, 60), msg: 'Contains bytes that are not UTF-8, usually Ñ or accented letters from a file saved as ANSI. Re-save the text file with UTF-8 encoding.' });
         }
         if (text.indexOf('|') < 0) {
@@ -794,6 +856,15 @@
     createLineFeeder: createLineFeeder,
     RULES: RULES,
     colLetter: colLetter,
-    parseDate: parseDate
+    parseDate: parseDate,
+    // Shared with the auto-fixer.
+    fieldDefs: COMPILED,
+    domainMatch: domainMatch,
+    stripZeros: stripZeros,
+    validYMD: validYMD,
+    GARBLED: GARBLED,
+    TIN_FIELDS: TIN_FIELDS,
+    TIN_RE: TIN_RE,
+    FILE_NAME_RE: FILE_NAME_RE
   };
 });

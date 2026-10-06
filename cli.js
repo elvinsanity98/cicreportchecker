@@ -2,9 +2,10 @@
 // Command-line front end for the checker. Handles .txt files (the browser tool
 // also reads .zip and .xlsx).
 //
-//   node cli.js <file.txt> [--mfi] [--csv issues.csv] [--all]
+//   node cli.js <file.txt> [--mfi] [--csv issues.csv] [--all] [--fix [--plain-letters] [--no-symbols]]
 //
-// Exit code: 0 = no errors, 1 = errors found, 2 = could not run.
+// --fix writes a corrected copy next to the input (new timestamp in its name).
+// Exit code: 0 = no errors (after fixing, with --fix), 1 = errors, 2 = could not run.
 const fs = require('fs');
 const path = require('path');
 const { createChecker, createLineFeeder } = require('./src/checker.js');
@@ -57,10 +58,30 @@ function main() {
     const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';
     const rows = [['Severity', 'Rule', 'Line', 'Record', 'Field No', 'Excel Column', 'Field', 'Value', 'Message']]
       .concat(r.issues.map((i) => [i.sev, i.code, i.line || '', i.rec, i.pos || '', i.col, i.field, i.value, i.msg]));
-    fs.writeFileSync(csvOut, '﻿' + rows.map((row) => row.map(q).join(',')).join('\r\n') + '\r\n');
+    fs.writeFileSync(csvOut, '\ufeff' + rows.map((row) => row.map(q).join(',')).join('\r\n') + '\r\n');
     console.log(`\nIssue list written to ${csvOut}`);
   }
-  process.exit(r.totals.error ? 1 : 0);
+  if (!args.includes('--fix')) process.exit(r.totals.error ? 1 : 0);
+
+  const FIXER = require('./src/fixer.js');
+  const fixer = FIXER.createFixer({ options: { enye: args.includes('--plain-letters'), symbols: args.includes('--no-symbols') } });
+  FIXER.feedBytes(fixer, new Uint8Array(fs.readFileSync(file)));
+  const out = fixer.finish();
+  console.log(`\nAuto-fix  ${out.total} fix(es) on ${out.changedLines} line(s)`);
+  for (const kind of FIXER.KINDS) {
+    if (out.counts[kind.id]) console.log(`    ${String(out.counts[kind.id]).padStart(6)}  ${kind.label}`);
+  }
+  if (!out.total) process.exit(r.totals.error ? 1 : 0);
+
+  const name = FIXER.suggestName(out.provider, path.basename(file));
+  const target = path.join(path.dirname(file), name);
+  fs.writeFileSync(target, out.lines.join('\r\n') + '\r\n', 'utf8');
+  const recheck = createChecker({ fileName: name, mfi: args.includes('--mfi') });
+  out.lines.forEach((line) => recheck.line(line));
+  const after = recheck.finish();
+  console.log(`Written   ${target}`);
+  console.log(`Now       ${after.totals.error} error(s), ${after.totals.warning} warning(s), ${after.totals.info} note(s) (was ${r.totals.error}, ${r.totals.warning}, ${r.totals.info})`);
+  process.exit(after.totals.error ? 1 : 0);
 }
 
 try {

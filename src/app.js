@@ -3,6 +3,7 @@
 (function () {
   'use strict';
   var CHECKER = window.CIC_CHECKER, SPEC = window.CIC_SPEC, DOMAINS = window.CIC_DOMAINS, READERS = window.CIC_READERS;
+  var FIXER = window.CIC_FIXER;
   var SEVS = ['error', 'warning', 'info'];
   var SEV_LABEL = { error: 'Error', warning: 'Warning', info: 'Note' };
   var SEV_PLURAL = { error: 'Errors', warning: 'Warnings', info: 'Notes' };
@@ -11,7 +12,7 @@
   var state = {
     file: null, result: null, runId: 0,
     sev: { error: true, warning: true, info: true }, rec: '', q: '', view: 'rule', page: 0,
-    open: {}, shown: {}, byGroup: {}, byLine: null
+    open: {}, shown: {}, byGroup: {}, byLine: null, fix: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -119,12 +120,14 @@
     state.shown = {};
     state.byLine = null;
     state.byGroup = {};
+    state.fix = null;
     r.issues.forEach(function (i) { (state.byGroup[i.group] || (state.byGroup[i.group] = [])).push(i); });
     SEVS.forEach(function (s) { state.sev[s] = true; });
     $('empty').hidden = true;
     var box = clear($('results'));
     box.hidden = false;
-    append(box, [verdict(r), notices(r), cards(r), findings(r)]);
+    append(box, [verdict(r), notices(r), h('section', { class: 'card fixcard', id: 'fixcard', 'aria-label': 'Auto-fix' }), cards(r), findings(r)]);
+    renderFix();
     var tab = $('tab-results');
     clear(tab);
     append(tab, ['Results', r.totals.error ? h('span', { class: 'count', text: num(r.totals.error) }) : null]);
@@ -470,28 +473,33 @@
     return rows;
   }
 
-  function downloadIssues() {
-    var csv = exportRows().map(function (row) {
-      return row.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
-    }).join('\r\n');
-    var blob = new Blob(['﻿' + csv + '\r\n'], { type: 'text/csv;charset=utf-8' });
-    var a = h('a', { href: URL.createObjectURL(blob), download: (state.result.fileName || 'file').replace(/\.[^.]+$/, '') + '_findings.csv' });
+  function saveBlob(blob, name) {
+    var a = h('a', { href: URL.createObjectURL(blob), download: name });
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
+  function downloadCsv(rows, name) {
+    var csv = rows.map(function (row) {
+      return row.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    // The byte-order mark makes Excel read the CSV as UTF-8.
+    saveBlob(new Blob([String.fromCharCode(0xfeff) + csv + '\r\n'], { type: 'text/csv;charset=utf-8' }), name);
+  }
+
   // Tab-separated text pastes into Excel correctly whatever the Windows list
   // separator is (CIC's guide has users change it to "|", which breaks CSVs).
-  function copyIssues() {
-    var text = exportRows().map(function (row) {
+  function copyRows(rows, btn) {
+    var text = rows.map(function (row) {
       return row.map(function (c) { return String(c).replace(/[\t\r\n]+/g, ' '); }).join('\t');
     }).join('\r\n');
-    var btn = $('copy-btn');
+    var label = btn.getAttribute('data-label') || btn.textContent;
+    btn.setAttribute('data-label', label);
     function done(ok) {
       btn.textContent = ok ? 'Copied' : 'Copy failed';
-      setTimeout(function () { btn.textContent = 'Copy for Excel'; }, 1600);
+      setTimeout(function () { btn.textContent = label; }, 1600);
     }
     function fallback() {
       var ta = h('textarea', { style: 'position:fixed;left:-9999px;top:0' });
@@ -508,6 +516,168 @@
     } else {
       fallback();
     }
+  }
+
+  function baseName() { return (state.result.fileName || 'file').replace(/\.[^.]+$/, ''); }
+  function downloadIssues() { downloadCsv(exportRows(), baseName() + '_findings.csv'); }
+  function copyIssues() { copyRows(exportRows(), $('copy-btn')); }
+
+  // ---- auto-fix ----------------------------------------------------------
+
+  var FIX_KEY = 'cic-checker-fix-options';
+  var FIX_PAGE = 50;
+  var fixOptions = (function () {
+    var o = FIXER.defaultOptions();
+    try {
+      var saved = JSON.parse(localStorage.getItem(FIX_KEY) || '{}');
+      for (var k in o) if (typeof saved[k] === 'boolean') o[k] = saved[k];
+    } catch (e) { /* storage unavailable: defaults apply */ }
+    o.encoding = true;
+    return o;
+  })();
+
+  function runFix() {
+    var file = state.file, id = state.runId;
+    if (!file) return;
+    state.fix = { running: true, progress: 0 };
+    renderFix();
+    READERS.fixFile(file, {
+      fixes: fixOptions, mfi: $('mfi').checked,
+      onProgress: function (f) {
+        var el = $('fix-progress');
+        if (el && id === state.runId) el.textContent = 'Working… ' + Math.round(f * 100) + '%';
+      }
+    }).then(function (res) {
+      if (id !== state.runId || state.file !== file) return;
+      state.fix = { out: res.fix, after: res.after, parts: res.parts, name: res.fileName, kind: '', page: 0 };
+      renderFix();
+    }).catch(function (err) {
+      if (id !== state.runId || state.file !== file) return;
+      state.fix = { error: err && err.message ? err.message : String(err) };
+      renderFix();
+    });
+  }
+
+  // Loads the corrected text into the page as if it had been dropped in.
+  function useFixed() {
+    var f = state.fix;
+    state.file = new File(f.parts, f.name, { type: 'text/plain' });
+    state.runId++;
+    setResult(f.after);
+    window.scrollTo(0, 0);
+  }
+
+  function changeRows() {
+    var r = state.result, f = state.fix;
+    var rows = [[r.where, 'Record', 'Field No', 'Excel Column', 'Field', 'Before', 'After', 'Fix']];
+    f.out.changes.forEach(function (c) {
+      rows.push([c.line || '', c.rec, c.pos || '', c.pos ? CHECKER.colLetter(c.pos) : '', c.field, c.before, c.after, c.note]);
+    });
+    return rows;
+  }
+
+  function fixOption(kind, f) {
+    var count = f && f.out ? f.out.counts[kind.id] : 0;
+    return h('label', { class: 'check fix-opt' },
+      h('input', {
+        type: 'checkbox', checked: fixOptions[kind.id], disabled: !!kind.always || !!(f && f.running),
+        onchange: function () {
+          fixOptions[kind.id] = this.checked;
+          try { localStorage.setItem(FIX_KEY, JSON.stringify(fixOptions)); } catch (e) { /* not remembered */ }
+          if (state.fix && state.fix.out) runFix();
+        }
+      }),
+      h('span', null, kind.label, count ? h('span', { class: 'count', text: num(count) }) : null,
+        kind.detail ? h('small', { text: kind.detail }) : null));
+  }
+
+  function renderFix() {
+    var card = $('fixcard');
+    if (!card) return;
+    clear(card);
+    var r = state.result, f = state.fix;
+    var excel = r.mode === 'excel';
+    var summary, actions = [];
+    var runLabel = excel ? 'Build fixed .txt' : 'Auto-fix this file';
+
+    if (!f) {
+      summary = excel
+        ? 'Builds the submission .txt from the sheet and corrects what can be corrected without guessing. You get the file and a list of every change.'
+        : 'Corrects what can be corrected without guessing: spacing, dates, numbers, codes, encoding and structure. You get a new file and a list of every change.';
+      actions.push(h('button', { class: 'btn primary', type: 'button', onclick: runFix }, runLabel));
+    } else if (f.running) {
+      summary = h('span', { id: 'fix-progress', text: 'Working…' });
+    } else if (f.error) {
+      summary = 'Auto-fix could not run. ' + f.error;
+      actions.push(h('button', { class: 'btn', type: 'button', onclick: runFix }, 'Try again'));
+    } else {
+      var o = f.out, a = f.after.totals, b = r.totals;
+      var delta = 'Errors ' + num(b.error) + ' → ' + num(a.error) + ', warnings ' + num(b.warning) + ' → ' + num(a.warning) + '.';
+      summary = o.total
+        ? num(o.total) + (o.total === 1 ? ' fix' : ' fixes') + ' on ' + plural(o.changedLines, r.where.toLowerCase()) + '. ' + delta
+        : excel ? 'Nothing needed correcting. ' + delta
+        : b.error + b.warning ? 'Nothing here can be fixed automatically. What is left needs a person to decide.'
+        : 'Nothing needs fixing.';
+      if (o.total || excel) {
+        actions.push(h('button', { class: 'btn primary', type: 'button', onclick: function () { saveBlob(new Blob(f.parts, { type: 'text/plain;charset=utf-8' }), f.name); } }, 'Download fixed file'));
+        actions.push(h('button', { class: 'btn', type: 'button', onclick: useFixed }, 'Show its findings'));
+      }
+    }
+
+    append(card, h('div', { class: 'fix-head' },
+      h('div', null, h('h3', { text: 'Auto-fix' }), h('p', { class: 'fix-summary' + (f && f.error ? ' bad' : '') }, summary)),
+      h('div', { class: 'chips' }, actions)));
+
+    if (f && f.out && (f.out.total || excel)) {
+      var notes = [f.name + ' is a new file with a new timestamp.'];
+      if (f.after.totals.error) notes.push(plural(f.after.totals.error, 'error') + ' still need fixing by hand.');
+      notes.push('Correct the same values in your master file too, or they come back next month.');
+      if (f.out.truncated) notes.push('Only the first ' + num(f.out.changes.length) + ' changes are listed; all were applied.');
+      card.appendChild(h('p', { class: 'fix-note', text: notes.join(' ') }));
+    }
+
+    var kinds = FIXER.KINDS;
+    card.appendChild(h('div', { class: 'fix-options' },
+      h('div', null, kinds.filter(function (k) { return !k.optional; }).map(function (k) { return fixOption(k, f); })),
+      h('div', null,
+        h('p', { class: 'fix-group', text: 'Your call: these change the data itself' }),
+        kinds.filter(function (k) { return k.optional; }).map(function (k) { return fixOption(k, f); }))));
+
+    if (!f || !f.out || !f.out.changes.length) return;
+
+    var changes = f.out.changes.filter(function (c) { return !f.kind || c.kind === f.kind; });
+    var pages = Math.ceil(changes.length / FIX_PAGE);
+    if (f.page >= pages) f.page = Math.max(0, pages - 1);
+    var tbody = h('tbody');
+    changes.slice(f.page * FIX_PAGE, (f.page + 1) * FIX_PAGE).forEach(function (c) {
+      tbody.appendChild(h('tr', null,
+        h('td', { class: 'line', text: c.line ? num(c.line) : '–' }),
+        h('td', { class: 'fld' }, c.pos ? [h('span', { class: 'tag pos', text: c.rec + c.pos }), ' ', h('span', { class: 'name', text: c.field })] : h('span', { class: 'name', text: c.rec ? c.rec + ' record' : 'Whole line' })),
+        h('td', { class: 'value' }, h('span', { class: 'lit old', text: c.before })),
+        h('td', { class: 'value' }, h('span', { class: 'lit new', text: c.after })),
+        h('td', { text: c.note })));
+    });
+    var filter = h('select', { 'aria-label': 'Kind of fix', onchange: function () { f.kind = this.value; f.page = 0; renderFix(); } },
+      h('option', { value: '', text: 'All fixes (' + num(f.out.changes.length) + ')' }),
+      kinds.filter(function (k) { return f.out.counts[k.id]; }).map(function (k) {
+        return h('option', { value: k.id, selected: f.kind === k.id, text: k.label + ' (' + num(f.out.counts[k.id]) + ')' });
+      }));
+    append(card, [
+      h('div', { class: 'toolbar fix-tools' },
+        h('label', { class: 'field grow' }, 'Changes made', filter),
+        h('button', { class: 'btn', type: 'button', onclick: function () { copyRows(changeRows(), this); } }, 'Copy for Excel'),
+        h('button', { class: 'btn', type: 'button', onclick: function () { downloadCsv(changeRows(), f.name.replace(/\.txt$/, '') + '_changes.csv'); } }, 'Download CSV')),
+      h('div', { class: 'table-scroll' },
+        h('table', { class: 'grid' },
+          h('thead', null, h('tr', null,
+            h('th', { style: 'width:5rem', text: r.where }), h('th', { style: 'width:22%', text: 'Field' }),
+            h('th', { style: 'width:22%', text: 'Before' }), h('th', { style: 'width:22%', text: 'After' }), h('th', { text: 'Fix' }))),
+          tbody)),
+      pages > 1 ? h('div', { class: 'pager' },
+        h('span', { text: num(f.page * FIX_PAGE + 1) + '–' + num(Math.min(changes.length, (f.page + 1) * FIX_PAGE)) + ' of ' + num(changes.length) }),
+        h('button', { class: 'btn small', type: 'button', disabled: f.page === 0, onclick: function () { f.page--; renderFix(); } }, 'Previous'),
+        h('button', { class: 'btn small', type: 'button', disabled: f.page >= pages - 1, onclick: function () { f.page++; renderFix(); } }, 'Next')) : null
+    ]);
   }
 
   // ---- code tables -------------------------------------------------------

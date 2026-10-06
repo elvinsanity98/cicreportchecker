@@ -182,7 +182,7 @@ test('line feeder handles chunk boundaries and CRLF', () => {
 
 test('broken sample trips the expected rules', () => {
   const r = check(fx.brokenLines(), { fileName: 'BANK1234_CSDF_20260705101500.txt' });
-  for (const code of ['S-LABEL', 'S-HD-FIRST', 'H-VERSION:HD4', 'H-SUBTYPE:HD5', 'V-DATE:ID14', 'V-CASE:ID13',
+  for (const code of ['S-LABEL', 'H-VERSION:HD4', 'H-SUBTYPE:HD5', 'V-DATE:ID14', 'V-CASE:ID13',
     'V-REQ:ID8', 'X-DUPSUBJ:ID5', 'X-REFDATE:ID4', 'V-CODE:ID17', 'C-PAIR:ID55', 'X-PROV:BD2', 'V-NUM:BD16',
     'X-DUPCON:CI7', 'V-CODE:CI11', 'S-BLANK', 'T-COUNT:FT4', 'X-NOSUBJ:CI5']) {
     assert.ok(has(r, code), code);
@@ -289,11 +289,57 @@ test('fixer: structure, header and footer', () => {
   const messy = ['Record Type|Provider Code|File Reference Date', src[0].replace('|1.0|', '|1|'), '', 'id' + src[1].slice(2)]
     .concat(src.slice(2, 12), ['', src[12].replace(/\|13$/, '|99') + '|||', '']);
   messy[5] = messy[5].replace(/\|+$/, '');
-  const out = fix(messy);
+  const out = fix(messy, { fieldcount: true });
   assert.deepStrictEqual(out.lines, src);
   assert.strictEqual(out.records, 13);
   assert.deepStrictEqual(codes(check(out.lines)), []);
-  for (const kind of ['structure', 'header', 'codes']) assert.ok(out.counts[kind] > 0, kind);
+  for (const kind of ['structure', 'fieldcount', 'header', 'codes']) assert.ok(out.counts[kind] > 0, kind);
+});
+
+// What a CSV export of the CIC workbook looks like: every line padded with
+// separators, blank sheet rows written as separators only, and the helper
+// row that holds nothing but "DDMMYYYY".
+function excelExport() {
+  const src = fx.cleanLines();
+  const bars = (n) => '|'.repeat(n);
+  return [src[0] + bars(137), bars(142), bars(13) + 'DDMMYYYY' + bars(129)]
+    .concat(src.slice(1, 4), [bars(142)], src.slice(4, 12), [bars(142), src[12] + bars(139), bars(142)]);
+}
+
+test('rows of separators and helper rows are not counted as records', () => {
+  const r = check(excelExport());
+  assert.strictEqual(r.records, 13);
+  assert.ok(!has(r, 'T-COUNT:FT4'), 'a correct footer count must not be reported');
+  assert.strictEqual(r.issues.filter((i) => i.code === 'S-BLANK').length, 4);
+  assert.deepStrictEqual(r.issues.filter((i) => i.code === 'S-TYPE').map((i) => [i.line, i.value]), [[3, 'DDMMYYYY']]);
+  // Padding with separators is only noted; a record cut short is a warning.
+  assert.ok(r.issues.filter((i) => i.code === 'S-COUNT').every((i) => i.sev === 'info'));
+  assert.strictEqual(withLine(0, 'HD|BANK1234|30062026|1.0|0').issues[0].sev, 'warning');
+});
+
+test('fixer: footer separators are kept and its count stays right', () => {
+  // A correct footer is left exactly as it is, trailing separator included.
+  const lines = fx.cleanLines().map((l) => l + '|');
+  const out = fix(lines);
+  assert.strictEqual(out.total, 0);
+  assert.strictEqual(out.lines[12], 'FT|BANK1234|30062026|13|');
+
+  // Removing leftover rows must not change a count that was already right.
+  const exported = fix(excelExport());
+  assert.strictEqual(exported.lines.length, 13);
+  assert.strictEqual(exported.records, 13);
+  assert.ok(exported.lines[12].startsWith('FT|BANK1234|30062026|13|'));
+  assert.strictEqual(exported.counts.header, 0);
+  assert.strictEqual(exported.counts.structure, 5);
+  assert.ok(!check(exported.lines).issues.some((i) => i.sev !== 'info'));
+
+  // A wrong count is corrected in place; the separator after it survives.
+  lines[12] = 'FT|BANK1234|30062026|99|';
+  assert.strictEqual(fix(lines).lines[12], 'FT|BANK1234|30062026|13|');
+  // Only when asked is the record cut to its layout length.
+  assert.strictEqual(fix(lines, { fieldcount: true }).lines[12], 'FT|BANK1234|30062026|13');
+  // The count includes header and footer, as in CIC's sample file (26 lines, "FT|...|26").
+  assert.strictEqual(fix(['HD|BANK1234|30062026|1.0|0|', 'FT|BANK1234|30062026|0']).lines[1], 'FT|BANK1234|30062026|2');
 });
 
 test('fixer: comma-delimited lines become pipe-delimited', () => {

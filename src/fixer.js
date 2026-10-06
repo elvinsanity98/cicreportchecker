@@ -19,10 +19,11 @@
 
   // Each kind can be switched off, except `encoding`: the output is always
   // written as UTF-8 without BOM. `optional` kinds change the data itself and
-  // are off unless asked for.
+  // are off unless asked for; `off` kinds are harmless but rarely wanted.
   var KINDS = [
     { id: 'encoding', always: true, label: 'Save as UTF-8 without BOM', detail: 'Keeps Ñ and accented letters readable when the file was saved as ANSI, and repairs garbled sequences such as Ã\u2018.' },
-    { id: 'structure', label: 'Remove label rows and blank lines; even out the field count', detail: 'Adds or drops empty fields at the end of a record so it matches the layout.' },
+    { id: 'structure', label: 'Remove label rows, empty lines and lines with no record type', detail: 'Empty lines include rows of separators only, which an Excel export writes for a blank row.' },
+    { id: 'fieldcount', off: true, label: 'Make every record exactly as long as its layout', detail: 'Adds or drops separators at the end of a record, such as a | after the footer count. Leave off unless CIC rejects the file for its structure.' },
     { id: 'delimiter', label: 'Turn comma-delimited lines into pipe-delimited' },
     { id: 'spaces', label: 'Trim values and collapse double spaces', detail: 'Also replaces tabs, line breaks and non-breaking spaces with a plain space.' },
     { id: 'punctuation', label: 'Remove quotes added by Excel; straighten curly quotes and long dashes' },
@@ -39,13 +40,15 @@
 
   function defaultOptions() {
     var o = {};
-    KINDS.forEach(function (k) { o[k.id] = !k.optional; });
+    KINDS.forEach(function (k) { o[k.id] = !(k.optional || k.off); });
     return o;
   }
 
   // Printable ASCII with single inner spaces, no space at either end and no
   // leading quote: nothing for the character-level fixes to do.
   var PLAIN = /^[!#-~](?:[!-~]| (?=[!-~]))*$/;
+  // Blank, or nothing but separators (an empty Excel row).
+  var NOT_A_LINE = /^[|\s]*$/;
   var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
   var CONTROL = /[\u0000-\u001f\u007f-\u009f]+/g;
   var ODD_SPACE = /[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g;
@@ -309,13 +312,13 @@
         if (!st.provider) st.provider = fields[1] || '';
       }
 
-      if (fields.length !== defs.length && (on.structure || excel)) {
+      if (fields.length !== defs.length && (on.fieldcount || excel)) {
         var extra = false;
         for (i = defs.length; i < fields.length; i++) if (fields[i]) { extra = true; break; }
         if (!extra) {
           // Excel rows are always shorter or longer than the layout; evening
           // them out is how the text file is built, not a correction.
-          if (!excel) log('structure', line, type, 0, '', fields.length + ' fields', defs.length + ' fields', fields.length < defs.length ? 'Empty fields added at the end' : 'Extra empty fields removed');
+          if (!excel) log('fieldcount', line, type, 0, '', fields.length + ' fields', defs.length + ' fields', fields.length < defs.length ? 'Empty fields added at the end' : 'Extra empty fields removed');
           while (fields.length < defs.length) fields.push('');
           fields.length = defs.length;
         }
@@ -339,8 +342,9 @@
           log('encoding', 1, '', 0, '', 'UTF-8 with BOM', 'UTF-8', 'Byte-order mark removed');
         }
         if (reencoded) log('encoding', n, '', 0, '', 'ANSI', 'UTF-8', 'Line re-saved as UTF-8');
-        if (!text.trim()) {
-          if (on.structure) log('structure', n, '', 0, '', '(blank line)', '(removed)', 'Blank line removed');
+        if (NOT_A_LINE.test(text)) {
+          var bare = text.indexOf('|') >= 0;
+          if (on.structure) log('structure', n, '', 0, '', bare ? '(separators only)' : '(blank line)', '(removed)', bare ? 'Line of separators removed' : 'Blank line removed');
           else st.lines.push(text);
           return;
         }
@@ -355,6 +359,11 @@
         }
         if (/^record type$/i.test(fields[0].trim()) && on.structure) {
           log('structure', n, '', 0, '', fields.slice(0, 3).join('|') + '\u2026', '(removed)', 'Label row removed');
+          return;
+        }
+        if (!fields[0].trim() && on.structure) {
+          var content = fields.filter(function (f) { return f && f.trim(); }).join(' | ').slice(0, 60);
+          log('structure', n, '', 0, '', content, '(removed)', 'Line with no record type removed');
           return;
         }
         record(fields, n);
@@ -384,8 +393,16 @@
       },
 
       finish: function () {
+        // Same count as the checker: empty lines, label rows and lines with
+        // no record type are not records.
         var records = 0;
-        for (var i = 0; i < st.lines.length; i++) if (st.lines[i].trim()) records++;
+        for (var i = 0; i < st.lines.length; i++) {
+          var text = st.lines[i];
+          if (NOT_A_LINE.test(text)) continue;
+          var bar = text.indexOf('|');
+          var first = (bar < 0 ? text : text.slice(0, bar)).trim();
+          if (first && !/^record type$/i.test(first)) records++;
+        }
         if (on.header && st.footerFields && st.footerFields[3] !== String(records)) {
           log('header', st.footerLine, 'FT', 4, 'No. of records', st.footerFields[3], String(records), 'Footer recounted');
           st.footerFields[3] = String(records);

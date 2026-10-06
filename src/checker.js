@@ -24,9 +24,9 @@
     'F-UTF8':       { sev: 'error',   basis: 'manual',   title: 'Line is not valid UTF-8' },
     'F-EMPTY':      { sev: 'error',   basis: 'manual',   title: 'File has no records' },
     'F-CONTAINER':  { sev: 'error',   basis: 'manual',   title: 'Problem with the ZIP or Excel container' },
-    'S-TYPE':       { sev: 'error',   basis: 'manual',   title: 'Unknown record type' },
+    'S-TYPE':       { sev: 'error',   basis: 'manual',   title: 'Unknown or missing record type' },
     'S-LABEL':      { sev: 'error',   basis: 'manual',   title: 'Column label row left in the file' },
-    'S-BLANK':      { sev: 'error',   basis: 'practice', title: 'Blank line' },
+    'S-BLANK':      { sev: 'error',   basis: 'practice', title: 'Empty line (blank, or separators only)' },
     'S-DELIM':      { sev: 'error',   basis: 'manual',   title: 'Line is not pipe-delimited' },
     'S-COUNT':      { sev: 'warning', basis: 'manual',   title: 'Field count differs from the record layout' },
     'S-EXTRA':      { sev: 'error',   basis: 'manual',   title: 'Data found beyond the last field of the layout' },
@@ -637,20 +637,26 @@
     }
 
     function record(fields, line) {
-      st.records++;
       var rawType = fields[0] === undefined ? '' : fields[0];
       var type = rawType.trim();
       var defs = COMPILED[type];
 
+      // Label rows and lines with no record type are leftovers to delete, not
+      // records, so they stay out of the count the footer has to match.
       if (!defs) {
         if (/^record type$/i.test(type)) {
           add('S-LABEL', { line: line, value: fields.slice(0, 4).join('|'), fields: fields, msg: 'Remove the label rows before converting the sheet to a text file.' });
+        } else if (!type) {
+          var content = fields.filter(function (f) { return f && f.trim(); }).join(' | ').slice(0, 60);
+          add('S-TYPE', { line: line, value: content, fields: fields, msg: 'Record type is empty, so this line is not a record. Delete it (a helper or note row from the sheet), or put its record type in the first field.' });
         } else {
+          st.records++;
           var known = COMPILED[type.toUpperCase()] ? ' Record types are upper case.' : '';
-          add('S-TYPE', { line: line, value: rawType, fields: fields, msg: (type ? '"' + type + '" is not a record type.' : 'Record type is empty.') + ' Use HD, ID, BD, SL, NE, CI, CN, CC, CS or FT.' + known });
+          add('S-TYPE', { line: line, value: rawType, fields: fields, msg: '"' + type + '" is not a record type. Use HD, ID, BD, SL, NE, CI, CN, CC, CS or FT.' + known });
         }
         return;
       }
+      st.records++;
       st.counts[type]++;
 
       if (type !== 'HD' && st.records === 1) {
@@ -669,11 +675,14 @@
         if (extra) {
           add('S-EXTRA', { line: line, rec: type, value: fields.slice(defs.length).join('|').slice(0, 80), fields: fields, msg: type + ' has ' + defs.length + ' fields but data continues to field ' + fields.length + '. A value may contain a pipe, or fields are shifted.' });
         } else if (!excel) {
+          // Extra separators at the end are what an Excel export leaves on
+          // every line, so they are only noted; a short record is a warning.
+          var short = fields.length < defs.length;
           add('S-COUNT', {
-            line: line, rec: type, value: fields.length + ' fields', fields: fields,
-            msg: fields.length < defs.length
+            sev: short ? 'warning' : 'info', line: line, rec: type, value: fields.length + ' fields', fields: fields,
+            msg: short
               ? type + ' has ' + defs.length + ' fields; found ' + fields.length + '. Missing trailing fields are read as empty here, but CIC checks file structure first.'
-              : type + ' has ' + defs.length + ' fields; found ' + fields.length + ' (extra empty fields at the end, usually from an Excel export).'
+              : type + ' has ' + defs.length + ' fields; found ' + fields.length + ': extra separators at the end, as an Excel export leaves them. Nothing to do unless CIC rejects the file for its structure.'
           });
         }
       }
@@ -703,9 +712,11 @@
     function flushBlanks(trailing) {
       if (!st.blanks.length) return;
       if (trailing) {
-        add('S-BLANK', { sev: 'warning', line: st.blanks[0], msg: st.blanks.length + ' blank line(s) at the end of the file. Delete them.' });
+        add('S-BLANK', { sev: 'warning', line: st.blanks[0].n, msg: st.blanks.length + ' empty line(s) at the end of the file. Delete them.' });
       } else {
-        st.blanks.forEach(function (n) { add('S-BLANK', { line: n, msg: 'Delete the empty line between records.' }); });
+        st.blanks.forEach(function (b) {
+          add('S-BLANK', { line: b.n, msg: b.separators ? 'Line holds only separators: an empty row from the Excel sheet. Delete it.' : 'Delete the empty line between records.' });
+        });
       }
       st.blanks = [];
     }
@@ -721,7 +732,8 @@
           add('F-BOM', { line: 1, msg: 'Save the file as "UTF-8" (not "UTF-8 with BOM" / "UTF-8 signature").' });
           text = text.slice(1);
         }
-        if (!text.trim()) { st.blanks.push(n); return; }
+        // A line of nothing but separators is an empty Excel row, not a record.
+        if (/^[|\s]*$/.test(text)) { st.blanks.push({ n: n, separators: text.indexOf('|') >= 0 }); return; }
         flushBlanks(false);
         if (text.indexOf('\ufffd') >= 0) {
           add('F-UTF8', { line: n, value: text.slice(0, 60), msg: 'Contains bytes that are not UTF-8, usually Ñ or accented letters from a file saved as ANSI. Re-save the text file with UTF-8 encoding.' });

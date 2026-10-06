@@ -37,7 +37,7 @@ alone and still reported.
 | Fix | Example |
 | --- | --- |
 | Save as UTF-8 without BOM (always on) | A file saved as ANSI keeps its `Ñ`; `PEÃ‘A` becomes `PEÑA` |
-| Remove label rows and blank lines; even out the field count | Trailing `\|\|\|` from Excel added or dropped |
+| Remove label rows, empty lines and lines with no record type | Rows of `\|\|\|\|` only, which Excel writes for a blank row; the `DDMMYYYY` helper row |
 | Comma-delimited lines to pipe-delimited | `HD,BANK1234,...` |
 | Trim values and collapse double spaces | `" JUAN  CARLOS "` to `JUAN CARLOS` |
 | Remove Excel quote wrapping; straighten curly quotes and long dashes | `"REYES"` to `REYES` |
@@ -46,6 +46,15 @@ alone and still reported.
 | Clean numbers | `1,250,000.00` to `1250000` |
 | TIN: digits only | `123-456-789-000` to `123456789000` |
 | Header version and footer count | `1` to `1.0`; footer recounted |
+
+The footer count is the number of records in the file, header and footer
+included, as in CIC's sample (26 lines, `FT|...|26`). Empty lines, label rows
+and lines with no record type are not records and are never counted.
+
+**Make every record exactly as long as its layout** is off by default. It adds
+or drops separators at the end of a record, for example the `|` after the
+footer count. An Excel export leaves those uneven on every line, so leave it
+off unless CIC rejects the file for its structure.
 
 Two more are **off until you tick them**, because they change the data itself.
 The choice is remembered on that computer.
@@ -111,7 +120,8 @@ node cli.js samples/with-errors/BANK1234_CSDF_20260705101500.txt
 
 Options: `--mfi`, `--all` (list every occurrence), `--csv findings.csv`,
 `--fix` (write a corrected copy next to the input; add `--plain-letters` for
-`Ñ` to `N` and `--no-symbols` to strip symbols).
+`Ñ` to `N`, `--no-symbols` to strip symbols, `--even-fields` to make every
+record exactly as long as its layout).
 Exit code is `0` when there are no errors, `1` when there are. Text files only.
 
 ## Change it

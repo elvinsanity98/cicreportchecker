@@ -2,7 +2,7 @@
 // Command-line front end for the checker. Handles .txt files (the browser tool
 // also reads .zip and .xlsx).
 //
-//   node cli.js <file.txt> [--mfi] [--csv issues.csv] [--all] [--fix [--plain-letters] [--no-symbols]]
+//   node cli.js <file.txt> [--mfi] [--csv issues.csv] [--all] [--fix [--plain-letters] [--no-symbols] [--even-fields]]
 //
 // --fix writes a corrected copy next to the input (new timestamp in its name).
 // Exit code: 0 = no errors (after fixing, with --fix), 1 = errors, 2 = could not run.
@@ -64,7 +64,9 @@ function main() {
   if (!args.includes('--fix')) process.exit(r.totals.error ? 1 : 0);
 
   const FIXER = require('./src/fixer.js');
-  const fixer = FIXER.createFixer({ options: { enye: args.includes('--plain-letters'), symbols: args.includes('--no-symbols') } });
+  const fixer = FIXER.createFixer({
+    options: { enye: args.includes('--plain-letters'), symbols: args.includes('--no-symbols'), fieldcount: args.includes('--even-fields') }
+  });
   FIXER.feedBytes(fixer, new Uint8Array(fs.readFileSync(file)));
   const out = fixer.finish();
   console.log(`\nAuto-fix  ${out.total} fix(es) on ${out.changedLines} line(s)`);

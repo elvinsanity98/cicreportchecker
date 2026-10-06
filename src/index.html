@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Eejay Gimena, IT Head, Rural Bank of Liloy (ZN), Inc.">
+<title>CIC Report Checker</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div>
+      <h1>CIC Report Checker</h1>
+      <p class="tagline">Pre-check a CSDF submission file before you zip, encrypt and upload it.</p>
+    </div>
+    <p class="offline" title="The page makes no network requests. The file is read by your browser only.">
+      <span class="dot" aria-hidden="true"></span>Works offline. Your file stays on this computer.
+    </p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card intake" aria-label="Choose a file">
+    <label class="drop" id="drop" for="file">
+      <input type="file" id="file" accept=".txt,.csv,.zip,.xlsx,.xlsm">
+      <span class="drop-title">Drop the submission file here, or click to choose</span>
+      <span class="drop-hint">.txt submission file &middot; .zip of the .txt &middot; .xlsx master file (sheet &ldquo;template&rdquo;)</span>
+    </label>
+    <div class="intake-options">
+      <label class="check">
+        <input type="checkbox" id="mfi">
+        <span>Submitting entity is a microfinance institution (MFI)
+          <small>Place of Birth and Nationality become optional for individuals.</small></span>
+      </label>
+    </div>
+    <div class="progress" id="progress" hidden>
+      <div class="bar"><div class="bar-fill" id="bar"></div></div>
+      <span id="progress-text">Reading…</span>
+    </div>
+    <p class="fail" id="fail" role="alert" hidden></p>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-results" aria-controls="panel-results" aria-selected="true">Results</button>
+    <button role="tab" id="tab-codes" aria-controls="panel-codes" aria-selected="false">Code tables</button>
+    <button role="tab" id="tab-steps" aria-controls="panel-steps" aria-selected="false">Before you submit</button>
+    <button role="tab" id="tab-rules" aria-controls="panel-rules" aria-selected="false">What is checked</button>
+  </nav>
+
+  <section id="panel-results" role="tabpanel" aria-labelledby="tab-results">
+    <div class="empty" id="empty">
+      <p><strong>No file checked yet.</strong></p>
+      <p>The checker reads the file line by line and reports structure problems, bad dates and numbers,
+        codes that are not in CIC&rsquo;s tables, duplicate subjects and contracts, and a footer count that does not match.</p>
+    </div>
+    <div id="results" hidden></div>
+  </section>
+
+  <section id="panel-codes" role="tabpanel" aria-labelledby="tab-codes" hidden>
+    <div class="toolbar">
+      <label class="field">Code table
+        <select id="code-table"></select>
+      </label>
+      <label class="field grow">Search
+        <input type="search" id="code-search" placeholder="Code or description, e.g. rice, PHP, mortgage">
+      </label>
+    </div>
+    <p class="muted" id="code-used"></p>
+    <div class="table-scroll">
+      <table class="grid" id="code-grid">
+        <thead><tr><th style="width:9rem">Code</th><th>Description</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="muted" id="code-note"></p>
+  </section>
+
+  <section id="panel-steps" role="tabpanel" aria-labelledby="tab-steps" hidden>
+    <ol class="steps">
+      <li>
+        <h3>Name and save the text file</h3>
+        <p><code>&lt;ProviderCode&gt;_CSDF_&lt;YYYYMMDDhhmmss&gt;.txt</code>, for example <code>BANK1234_CSDF_20150130143010.txt</code>.
+          The provider code is the 8-character code CIC assigned; the timestamp is when the file was created, in 24-hour time.
+          Save as UTF-8 without BOM, pipe-delimited, with the label rows removed.</p>
+      </li>
+      <li>
+        <h3>Zip it</h3>
+        <p>Right-click the text file &rarr; Send to &rarr; Compressed (zipped) folder. One text file per zip.</p>
+      </li>
+      <li>
+        <h3>Encrypt the zip with Kleopatra</h3>
+        <p>Sign/Encrypt Files &rarr; select the zip &rarr; tick only <em>Encrypt for others</em> and pick
+          &ldquo;Credit Information Corporation&rdquo;. Untick <em>Sign as</em> and <em>Encrypt for me</em>, then Encrypt.
+          Testing and Production use different keys; the Production key is renewed every year.</p>
+      </li>
+      <li>
+        <h3>Upload the .gpg or .pgp file</h3>
+        <p>Open the web client at <code>mftp.creditinfo.com.ph/webclient/WebClient.xhtml</code>, log in and enter the 6-digit code
+          e-mailed to you. Go to SUBMISSION &rarr; INPUT and upload. A &ldquo;File was Successfully Uploaded&rdquo; e-mail confirms it.</p>
+      </li>
+      <li>
+        <h3>File the transmittal</h3>
+        <p>CE Portal &rarr; Transmittal Module &rarr; Pending Transmittals &rarr; + File transmittal. Enter the covered period,
+          the submission type and the record counts per type. The Results tab shows those counts for the file you checked.
+          Only the Primary Contact Person can open this module.</p>
+      </li>
+      <li>
+        <h3>Collect CIC&rsquo;s result</h3>
+        <p>Download it from SUBMISSION &rarr; OUTPUT. CIC validates in three phases: PRE (file structure),
+          CPS/CPC (checking of subject and contract records) and LPS/LPC (loading into the database).</p>
+      </li>
+    </ol>
+    <div class="note">
+      <h3>Dates to keep in mind</h3>
+      <ul>
+        <li>Regular submissions are monthly and due on the 10th day of the following month.</li>
+        <li>A request for extension can only be filed from the 1st to the 10th of the month, for that month&rsquo;s regular submission.</li>
+        <li>Correction files answer an Output Error Report within 15 working days; dispute corrections within 5 working days of the notice.</li>
+        <li>Special submissions (corrections, disputes, delayed or historical data) go in their own file, never mixed into the regular one.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
+    <p class="lead">Each finding carries a rule code. <span class="tag basis-manual">CIC manual</span> rules come from the CIC session
+      materials and the &ldquo;Fields in Excel&rdquo; workbook. <span class="tag basis-practice">Sanity check</span> rules are sensible
+      checks that those materials do not spell out, so treat them as prompts to look, not as CIC&rsquo;s verdict.</p>
+    <div class="table-scroll">
+      <table class="grid" id="rule-grid">
+        <thead><tr><th style="width:8rem">Rule</th><th style="width:7rem">Severity</th><th>What it means</th><th style="width:9rem">Basis</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <p class="credit">Developed by <strong>Eejay Gimena</strong> &middot; IT Head &middot; Rural Bank of Liloy (ZN), Inc.</p>
+  <p>Unofficial helper, not affiliated with the Credit Information Corporation. It does not replace CIC&rsquo;s own validation;
+    a file that passes here can still be rejected. Code tables: <span id="domain-source"></span>.</p>
+</footer>
+
+<div class="overlay" id="overlay" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Record details" hidden></aside>
+
+<script src="domains.js"></script>
+<script src="spec.js"></script>
+<script src="checker.js"></script>
+<script src="readers.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

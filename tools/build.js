@@ -1,4 +1,4 @@
-// Bundles src/ into one self-contained file: CIC-Report-Checker.html.
+// Bundles src/ into one self-contained file: index.html in the repository root.
 // Run: node tools/build.js
 const fs = require('fs');
 const path = require('path');
@@ -12,6 +12,6 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (_, file) =>
   `<script>\n${read(file).replace(/<\/script/gi, '<\/script')}</script>`);
 if (/<script src=|<link rel="stylesheet"/.test(html)) throw new Error('Something was not inlined.');
 
-const out = path.join(__dirname, '..', 'CIC-Report-Checker.html');
+const out = path.join(__dirname, '..', 'index.html');
 fs.writeFileSync(out, html);
 console.log(`wrote ${path.basename(out)} (${Math.round(html.length / 1024)} KB)`);

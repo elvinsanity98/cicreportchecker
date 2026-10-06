@@ -9,7 +9,8 @@ that passes here can still be rejected.
 
 ## Use it
 
-Open **`CIC-Report-Checker.html`** in Chrome, Edge or Firefox and drop a file on it.
+Open **`index.html`** (the one in the top folder) in Chrome, Edge or Firefox and
+drop a file on it.
 
 - `.txt`: the submission file. This is the check that counts.
 - `.zip`: the zipped `.txt`, before encryption.
@@ -76,14 +77,14 @@ Exit code is `0` when there are no errors, `1` when there are. Text files only.
 ## Change it
 
 ```
-CIC-Report-Checker.html   built file; this is what people open
+index.html                built file; this is what people open (do not edit)
 cli.js                    command-line front end
 src/spec.js               record layouts and field rules
 src/domains.js            code tables (generated)
 src/checker.js            validation engine and the rule list
 src/readers.js            .txt / .zip / .xlsx readers
-src/app.js, index.html, styles.css   the page
-tools/build.js            bundles src/ into CIC-Report-Checker.html
+src/index.html, app.js, styles.css   the page source
+tools/build.js            bundles src/ into the top-level index.html
 tools/build_domains.py    regenerates src/domains.js from CIC's workbook
 tools/make_samples.js     writes the fictitious files in samples/
 test/run.js               tests

@@ -297,6 +297,8 @@
 
   function renderList() {
     var r = state.result;
+    // A file with no findings has no list to fill.
+    if (!$('list')) return;
     var list = clear($('list'));
     if (state.view === 'rule') renderGroups(r, list);
     else renderFlat(r, list);
